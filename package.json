@@ -1,0 +1,36 @@
+{
+  "name": "exercicios_app_backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "db:seed": "prisma db seed"
+  },
+ "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mariaconradtech/exercicios-app-backend.git"
+},
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mariaconradtech/exercicios-app-backend/issues"
+  },
+  "homepage": "https://github.com/mariaconradtech/exercicios-app-backend#readme",
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@types/pg": "^8.20.0",
+    "prisma": "^7.9.0",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.23.1"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.9.0",
+    "@prisma/client": "^7.9.0",
+    "pg": "^8.22.0"
+  }
+}
