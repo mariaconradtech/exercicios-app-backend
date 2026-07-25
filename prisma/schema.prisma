@@ -122,6 +122,7 @@ model Exercicio {
   pesquisador Pesquisador       @relation(fields: [pesquisadorId], references: [id])
   categoria   Categoria         @relation(fields: [categoriaId], references: [id])
   treinos     TreinoExercicio[]
+  progressos  SessaoExercicio[]
 
   @@map("exercicio")
 }
@@ -173,6 +174,21 @@ model SessaoTreino {
 
   participante Participante @relation(fields: [participanteId], references: [id])
   treino       Treino       @relation(fields: [treinoId], references: [id])
+  itensProgresso SessaoExercicio[]
 
   @@map("sessao_treino")
+}
+
+model SessaoExercicio {
+  id               Int     @id @default(autoincrement())
+  sessaoId         Int     @map("sessao_id")
+  exercicioId      Int     @map("exercicio_id")
+  seriesConcluidas Int     @default(0) @map("series_concluidas")
+  concluido        Boolean @default(false)
+
+  sessao    SessaoTreino @relation(fields: [sessaoId], references: [id], onDelete: Cascade)
+  exercicio Exercicio    @relation(fields: [exercicioId], references: [id])
+
+  @@unique([sessaoId, exercicioId])
+  @@map("sessao_exercicio")
 }
