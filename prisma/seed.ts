@@ -41,7 +41,7 @@ async function main() {
       pesquisadorId,
       categoriaId: categoriaForca.id,
       nome: 'Supino Reto com Barra',
-      videoUrl: 'https://exemplo.com/videos/supino.mp4',
+      videoUrl: 'https://youtube.com/shorts/UHa9U-O09_U?si=IXJtnNnXIwWJBp3Y',
       instrucao: [
         'Deite-se no banco alinhado com a barra.',
         'Segure a barra com pegada na largura dos ombros.',
@@ -56,7 +56,7 @@ async function main() {
       pesquisadorId,
       categoriaId: categoriaForca.id,
       nome: 'Agachamento Livre',
-      videoUrl: 'https://exemplo.com/videos/agachamento.mp4',
+      videoUrl: 'https://youtube.com/shorts/nvVa-WFGwmM?si=wd0kKRonfacnLWnF',
       instrucao: [
         'Posicione a barra nos trapézios.',
         'Mantenha os pés na largura dos ombros.',
@@ -71,11 +71,56 @@ async function main() {
       pesquisadorId,
       categoriaId: categoriaForca.id,
       nome: 'Remada Curvada',
-      videoUrl: 'https://exemplo.com/videos/remada.mp4',
+      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
       instrucao: [
         'Incline o tronco à frente mantendo a coluna reta.',
         'Puxe a barra em direção ao abdômen.',
         'Controle a descida da barra até a extensão total dos braços.',
+      ],
+      ativo: true,
+    },
+  });
+
+  const exercicio4 = await prisma.exercicio.create({
+    data: {
+      pesquisadorId,
+      categoriaId: categoriaForca.id,
+      nome: 'Desenvolvimento com Halteres',
+      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+      instrucao: [
+        'Sente-se com apoio nas costas, halteres na altura dos ombros.',
+        'Empurre os halteres para cima até quase estender os cotovelos.',
+        'Desça controladamente até a posição inicial.',
+      ],
+      ativo: true,
+    },
+  });
+
+  const exercicio5 = await prisma.exercicio.create({
+    data: {
+      pesquisadorId,
+      categoriaId: categoriaForca.id,
+      nome: 'Rosca Direta',
+      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/VolkswagenGTIReview.mp4',
+      instrucao: [
+        'Segure a barra com os braços estendidos ao lado do corpo.',
+        'Flexione os cotovelos trazendo a barra até os ombros.',
+        'Desça controladamente sem balançar o tronco.',
+      ],
+      ativo: true,
+    },
+  });
+
+  const exercicio6 = await prisma.exercicio.create({
+    data: {
+      pesquisadorId,
+      categoriaId: categoriaForca.id,
+      nome: 'Tríceps na Polia',
+      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
+      instrucao: [
+        'Segure a barra da polia com os cotovelos junto ao corpo.',
+        'Estenda os braços empurrando a barra para baixo.',
+        'Retorne controladamente sem afastar os cotovelos do corpo.',
       ],
       ativo: true,
     },
