@@ -2,7 +2,7 @@ import 'dotenv/config';
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient, StatusSessao } from './generated/prisma/client.ts';
+import { PrismaClient, StatusSessao } from './generated/prisma/client';
 
 const port = Number(process.env.PORT ?? 3000);
 const databaseUrl =
