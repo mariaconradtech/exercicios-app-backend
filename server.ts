@@ -108,8 +108,8 @@ const server = createServer(async (request, response) => {
       const treinoId = parseInteger(payload.treinoId);
 
       if (participanteId === null || treinoId === null) {
-        sendJson(response, 404, {
-          error: 'Nenhuma sessao de treino encontrada para atualizar. Envie sessionId, participanteId e treinoId.',
+        sendJson(response, 400, {
+          error: 'Parametros invalidos. Envie sessionId, participanteId e treinoId.',
         });
         return;
       }
