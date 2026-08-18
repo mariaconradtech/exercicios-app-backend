@@ -60,16 +60,7 @@ async function resolveSessao(payload: FeedbackPayload) {
     }
   }
 
-  const sessaoAberta = await prisma.sessaoTreino.findFirst({
-    where: { status: StatusSessao.EM_ANDAMENTO },
-    orderBy: { dataInicio: 'desc' },
-  });
-
-  if (sessaoAberta) {
-    return sessaoAberta;
-  }
-
-  return prisma.sessaoTreino.findFirst({ orderBy: { dataInicio: 'desc' } });
+  return null;
 }
 
 const server = createServer(async (request, response) => {
