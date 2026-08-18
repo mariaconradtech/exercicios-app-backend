@@ -93,7 +93,17 @@ const server = createServer(async (request, response) => {
     }
 
     const rawBody = Buffer.concat(chunks).toString('utf-8');
-    const payload = rawBody ? (JSON.parse(rawBody) as FeedbackPayload) : {};
+    let payload: FeedbackPayload = {};
+
+    if (rawBody) {
+      try {
+        payload = JSON.parse(rawBody) as FeedbackPayload;
+      } catch {
+        sendJson(response, 400, { error: 'JSON invalido.' });
+        return;
+      }
+    }
+
     const rating = parseInteger(payload.rating);
 
     if (rating === null || rating < 0 || rating > 10) {
