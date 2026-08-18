@@ -69,10 +69,15 @@ sessoesRouter.patch('/:sessaoId/finalizar', async (req, res) => {
       percentualConcluido: number;
     };
 
+    if (status !== 'CONCLUIDA' && status !== 'INTERROMPIDA') {
+      res.status(400).json({ error: 'status inválido' });
+      return;
+    }
+
     await prisma.sessaoTreino.update({
       where: { id: sessaoId },
       data: {
-        status: status as StatusSessao,
+        status: status === 'CONCLUIDA' ? StatusSessao.CONCLUIDA : StatusSessao.INTERROMPIDA,
         tempoRealizadoSegundos,
         percentualConcluido,
         dataFim: new Date(),
