@@ -140,8 +140,8 @@ const server = createServer(async (request, response) => {
 
     sendJson(response, 200, { message: 'Feedback salvo com sucesso.', sessao: atualizada });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Falha ao salvar feedback.';
-    sendJson(response, 500, { error: message });
+    console.error(error);
+    sendJson(response, 500, { error: 'Falha ao salvar feedback.' });
   }
 });
 
