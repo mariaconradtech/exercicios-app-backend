@@ -4,6 +4,7 @@ import cors from 'cors';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, Prisma, StatusSessao } from '../generated/prisma/client';
 
+import { categoriasRouter } from './routes/categorias';
 import { sessoesRouter } from './routes/sessoes';
 import { treinosRouter } from './routes/treinos';
 import { engajamentoRouter } from './routes/engajamento';
@@ -25,6 +26,7 @@ app.get('/health', (_req, res) => {
 
 app.use('/treinos', treinosRouter);
 app.use('/sessoes', sessoesRouter);
+app.use('/categorias', categoriasRouter);
 app.use('/engajamento', engajamentoRouter);
 
 app.post('/avaliacoes', async (req, res) => {
