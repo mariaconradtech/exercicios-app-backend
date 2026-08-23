@@ -5,22 +5,22 @@ export const autenticacaoRouter = Router();
 
 autenticacaoRouter.post('/login', async (req, res) => {
   try {
-    const { email, senha } = req.body as { email?: string; senha?: string };
+    const { cpf, senha } = req.body as { cpf?: string; senha?: string };
 
-    if (!email || typeof email !== 'string' || !email.trim()) {
-      return res.status(400).json({ error: 'Email é obrigatório' });
+    if (!cpf || typeof cpf !== 'string' || !cpf.trim()) {
+      return res.status(400).json({ error: 'CPF é obrigatório' });
     }
 
     if (!senha || typeof senha !== 'string' || !senha.trim()) {
       return res.status(400).json({ error: 'Senha é obrigatória' });
     }
 
-    const usuario = await prisma.usuario.findUnique({
-      where: { email: email.trim() },
-      include: { participante: true },
+    const participante = await prisma.participante.findUnique({
+      where: { cpf: cpf.replace(/\D/g, '') },
+      include: { usuario: true },
     });
 
-    if (!usuario || !usuario.participante) {
+    if (!participante) {
       return res.status(401).json({ error: 'Email ou senha inválidos' });
     }
 
@@ -31,11 +31,12 @@ autenticacaoRouter.post('/login', async (req, res) => {
     // }
 
     res.json({
-      usuarioId: usuario.id,
-      participanteId: usuario.participante.id,
-      nome: usuario.nome,
-      email: usuario.email,
-      tipo: usuario.tipo,
+      usuarioId: participante.usuario.id,
+      participanteId: participante.id,
+      nome: participante.usuario.nome,
+      cpf: participante.cpf,
+      email: participante.usuario.email,
+      tipo: participante.usuario.tipo,
     });
   } catch (error) {
     res
