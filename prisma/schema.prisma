@@ -117,7 +117,9 @@ model Exercicio {
   nome          String
   videoUrl      String   @map("video_url")
   instrucao     String[] @map("instrucao")
+  nivel         Int      @default(1)
   ativo         Boolean  @default(true)
+  criadoEm      DateTime @default(now()) @map("criado_em")
 
   pesquisador Pesquisador       @relation(fields: [pesquisadorId], references: [id])
   categoria   Categoria         @relation(fields: [categoriaId], references: [id])

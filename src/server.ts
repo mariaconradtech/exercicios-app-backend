@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import path from 'path';
 import express from 'express';
 import cors from 'cors';
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -7,6 +8,8 @@ import { PrismaClient, Prisma, StatusSessao } from '../generated/prisma/client';
 import { sessoesRouter } from './routes/sessoes';
 import { treinosRouter } from './routes/treinos';
 import { engajamentoRouter } from './routes/engajamento';
+import { categoriasRouter } from './routes/categorias';
+import { exerciciosRouter } from './routes/exercicios';
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const app = express();
@@ -14,6 +17,7 @@ const prisma = new PrismaClient({ adapter });
 
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static(path.resolve(__dirname, '..', 'uploads')));
 
 app.get('/', (_req, res) => {
   res.json({ status: 'ok' });
@@ -26,6 +30,8 @@ app.get('/health', (_req, res) => {
 app.use('/treinos', treinosRouter);
 app.use('/sessoes', sessoesRouter);
 app.use('/engajamento', engajamentoRouter);
+app.use('/categorias', categoriasRouter);
+app.use('/exercicios', exerciciosRouter);
 
 app.post('/avaliacoes', async (req, res) => {
   const { sessaoId, rating } = req.body;
@@ -53,6 +59,14 @@ app.post('/avaliacoes', async (req, res) => {
   }
 
   return res.status(200).json({ message: 'Avaliação salva com sucesso' });
+});
+
+app.use((err: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (res.headersSent) {
+    next(err);
+    return;
+  }
+  res.status(400).json({ error: err instanceof Error ? err.message : 'Erro ao processar a requisição' });
 });
 
 const PORT = Number(process.env.PORT ?? 3000);
