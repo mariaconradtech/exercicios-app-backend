@@ -1,3 +1,5 @@
+process.env.TZ = process.env.TZ ?? 'America/Sao_Paulo';
+
 import 'dotenv/config';
 
 import express from 'express';
