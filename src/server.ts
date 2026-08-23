@@ -6,6 +6,7 @@ import { PrismaClient, Prisma, StatusSessao } from '../generated/prisma/client';
 
 import { sessoesRouter } from './routes/sessoes';
 import { treinosRouter } from './routes/treinos';
+import { engajamentoRouter } from './routes/engajamento';
 import { participantesRouter } from './routes/participantes';
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
@@ -25,7 +26,6 @@ app.get('/health', (_req, res) => {
 
 app.use('/treinos', treinosRouter);
 app.use('/sessoes', sessoesRouter);
-app.use('/participantes', participantesRouter);
 
 app.post('/avaliacoes', async (req, res) => {
   const { sessaoId, rating } = req.body;

@@ -12,9 +12,9 @@ participantesRouter.patch('/:participanteId/avatar', async (req, res) => {
     return res.status(400).json({ error: 'participanteId inválido' });
   }
 
-  const { avatarGenero, avatarPersonagem } = req.body as {
+  const { avatarGenero, nomeAvatar } = req.body as {
     avatarGenero?: string;
-    avatarPersonagem?: string;
+    nomeAvatar?: string;
   };
 
   if (avatarGenero !== 'FEMININO' && avatarGenero !== 'MASCULINO') {
@@ -23,31 +23,26 @@ participantesRouter.patch('/:participanteId/avatar', async (req, res) => {
       .json({ error: 'avatarGenero deve ser "FEMININO" ou "MASCULINO"' });
   }
 
-  const personagem =
-    typeof avatarPersonagem === 'string' && avatarPersonagem.trim().length > 0
-      ? avatarPersonagem.trim()
-      : avatarGenero === 'FEMININO'
-      ? 'padrao-feminino'
-      : 'padrao-masculino';
+  const nomeFinal = typeof nomeAvatar === 'string' ? nomeAvatar.trim() || null : null;
 
   try {
     const perfil = await prisma.perfilGamificado.upsert({
       where: { participanteId },
       update: {
         avatarGenero: avatarGenero as GeneroAvatar,
-        avatarPersonagem: personagem,
+        nomeAvatar: nomeFinal,
       },
       create: {
         participanteId,
         avatarGenero: avatarGenero as GeneroAvatar,
-        avatarPersonagem: personagem,
+        nomeAvatar: nomeFinal,
       },
     });
 
     return res.status(200).json({
       participanteId: perfil.participanteId,
       avatarGenero: perfil.avatarGenero,
-      avatarPersonagem: perfil.avatarPersonagem,
+      nomeAvatar: perfil.nomeAvatar,
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
