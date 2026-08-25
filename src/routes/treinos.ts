@@ -26,6 +26,8 @@ treinosRouter.get('/:treinoId/execucao', async (req, res) => {
     res.json({
       id: treino.id,
       nome: treino.nome,
+      fase: treino.fase,
+      nivel: treino.nivel,
       itens: treino.exercicios.map((te) => ({
         exercicioId: te.exercicioId,
         ordem: te.ordem,
