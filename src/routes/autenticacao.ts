@@ -96,34 +96,3 @@ autenticacaoRouter.patch('/senha', async (req, res) => {
   }
 });
 
-autenticacaoRouter.get('/engajamento', async (req, res) => {
-  try {
-    const participanteId = Number(req.query.participanteId);
-
-    if (!Number.isFinite(participanteId) || participanteId <= 0) {
-      return res.status(400).json({ error: 'participanteId inválido' });
-    }
-
-    const perfil = await prisma.perfilGamificado.findUnique({
-      where: { participanteId },
-    });
-
-    if (!perfil) {
-      return res.status(404).json({ error: 'Perfil de gamificação não encontrado' });
-    }
-
-    res.json({
-      participanteId: perfil.participanteId,
-      nivelAtual: perfil.nivelAtual,
-      pontos: perfil.pontos,
-      estrelas: perfil.estrelas,
-      medalhas: perfil.medalhas,
-      trofeus: perfil.trofeus,
-      faseAtual: perfil.faseAtual,
-    });
-  } catch (error) {
-    res
-      .status(500)
-      .json({ error: error instanceof Error ? error.message : 'Erro desconhecido' });
-  }
-});
