@@ -19,6 +19,8 @@ const prisma = new PrismaClient({ adapter });
 
 const origensPermitidas = [
   'http://localhost:5173',
+  'http://localhost:8081',
+  'http://192.168.0.107:8081',
   ...(process.env.FRONTEND_URL_PRODUCAO ? [process.env.FRONTEND_URL_PRODUCAO] : []),
 ];
 
