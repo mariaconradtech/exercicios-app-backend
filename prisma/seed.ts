@@ -138,7 +138,7 @@ async function main() {
   const treino = await prisma.treino.create({
     data: {
       nome: 'Treino de Força - Semana 1',
-      instrucoes: 'Treino introdutório de força para iniciantes. Use um tapete e halteres leves.',
+      descricao: 'Tapete, Halteres leves, Banco de exercícios',
       fase: FaseTreino.INICIANTE,
       nivel: 1,
       quantidadeSemanas: 4,
@@ -163,14 +163,13 @@ async function main() {
           cpf: '12345678900',
           senha: 'senha_segura_123',
           perfil: {
-            create: {
-              avatarGenero: GeneroAvatar.FEMININO,
-              avatarPersonagem: 'guerreira_01',
-              nomeAvatar: 'Valente',
-              faseAtual: FaseTreino.INICIANTE,
-              nivelAtual: 1,
-              pontos: 100,
-            },
+          create: {
+            avatarGenero: GeneroAvatar.FEMININO,
+            nomeAvatar: 'Valente',
+            faseAtual: FaseTreino.INICIANTE,
+            nivelAtual: 1,
+            pontos: 100,
+          },
           },
         },
       },

@@ -6,6 +6,70 @@ import { calcularDuracaoEstimadaMinutos, faseParaLabel, labelParaFase, NIVEIS_VA
 
 export const treinosRouter = Router();
 
+treinosRouter.get('/participante/:participanteId/ativo', async (req, res) => {
+  try {
+    const participanteId = Number(req.params.participanteId);
+
+    if (!Number.isInteger(participanteId) || participanteId <= 0) {
+      res.status(400).json({ error: 'participanteId inválido' });
+      return;
+    }
+
+    const participante = await prisma.participante.findUnique({
+      where: { id: participanteId },
+      include: { perfil: true },
+    });
+
+    if (!participante) {
+      res.status(404).json({ error: 'Participante não encontrado' });
+      return;
+    }
+
+    const treino = await prisma.treino.findFirst({
+      where: {
+        ativo: true,
+        fase: participante.perfil?.faseAtual ?? FaseTreino.INICIANTE,
+      },
+      include: {
+        exercicios: {
+          include: { exercicio: true },
+          orderBy: { ordem: 'asc' },
+        },
+      },
+      orderBy: { nivel: 'asc' },
+    });
+
+    if (!treino) {
+      res.status(404).json({ error: 'Nenhum treino ativo encontrado para a fase do participante' });
+      return;
+    }
+
+    res.json({
+      id: treino.id,
+      nome: treino.nome,
+      descricao: treino.descricao,
+      fase: treino.fase,
+      nivel: treino.nivel,
+      itens: treino.exercicios.map((te, index) => ({
+        exercicioId: te.exercicioId,
+        ordem: index + 1,
+        series: te.series,
+        descansoSegundos: te.descansoSegundos,
+        multiplicadorVelocidade: te.multiplicadorVelocidade,
+        duracaoEstimadaSegundos: te.duracaoEstimadaSegundos,
+        exercicio: {
+          id: te.exercicio.id,
+          nome: te.exercicio.nome,
+          videoUrl: te.exercicio.videoUrl,
+          instrucao: te.exercicio.instrucao,
+        },
+      })),
+    });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Erro desconhecido' });
+  }
+});
+
 treinosRouter.get('/:treinoId/execucao', async (req, res) => {
   try {
     const treinoId = Number(req.params.treinoId);
@@ -15,7 +79,7 @@ treinosRouter.get('/:treinoId/execucao', async (req, res) => {
       include: {
         exercicios: {
           include: { exercicio: true },
-          orderBy: { id: 'asc' },
+          orderBy: { ordem: 'asc' },
         },
       },
     });
@@ -28,6 +92,9 @@ treinosRouter.get('/:treinoId/execucao', async (req, res) => {
     res.json({
       id: treino.id,
       nome: treino.nome,
+      descricao: treino.descricao,
+      fase: treino.fase,
+      nivel: treino.nivel,
       itens: treino.exercicios.map((te, index) => ({
         exercicioId: te.exercicioId,
         ordem: index + 1,
@@ -60,7 +127,7 @@ type ItemTreinoExercicioEntrada = {
 
 type TreinoEntradaValidada = {
   nome: string;
-  instrucoes: string;
+  descricao: string;
   fase: FaseTreino;
   nivel: number;
   quantidadeSemanas: number;
@@ -87,15 +154,15 @@ function validarRequisicaoTreino(body: unknown): { dados: TreinoEntradaValidada 
     return { erro: 'Corpo da requisição inválido.' };
   }
 
-  const { nome, instrucoes, fase, nivel, quantidadeSemanas, descansoEntreSeriesSegundos, exercicios } =
+  const { nome, descricao, fase, nivel, quantidadeSemanas, descansoEntreSeriesSegundos, exercicios } =
     body as Record<string, unknown>;
 
   if (typeof nome !== 'string' || !nome.trim()) {
     return { erro: "O campo 'nome' é obrigatório." };
   }
 
-  if (typeof instrucoes !== 'string' || !instrucoes.trim()) {
-    return { erro: "O campo 'instrucoes' é obrigatório." };
+  if (typeof descricao !== 'string' || !descricao.trim()) {
+    return { erro: "O campo 'descricao' é obrigatório." };
   }
 
   if (typeof fase !== 'string' || !fase.trim()) {
@@ -169,7 +236,7 @@ function validarRequisicaoTreino(body: unknown): { dados: TreinoEntradaValidada 
   return {
     dados: {
       nome: nome.trim(),
-      instrucoes: instrucoes.trim(),
+      descricao: descricao.trim(),
       fase: faseEnum,
       nivel,
       quantidadeSemanas,
@@ -192,7 +259,7 @@ function formatarTreinoDetalhado(treino: TreinoComExercicios) {
   return {
     id: treino.id,
     nome: treino.nome,
-    instrucoes: treino.instrucoes,
+    descricao: treino.descricao,
     fase: faseParaLabel(treino.fase),
     nivel: treino.nivel,
     quantidadeSemanas: treino.quantidadeSemanas,
@@ -296,7 +363,7 @@ treinosRouter.post('/', async (req, res) => {
     const treinoCriado = await prisma.treino.create({
       data: {
         nome: dados.nome,
-        instrucoes: dados.instrucoes,
+        descricao: dados.descricao,
         fase: dados.fase,
         nivel: dados.nivel,
         quantidadeSemanas: dados.quantidadeSemanas,
@@ -346,7 +413,7 @@ treinosRouter.put('/:id', async (req, res) => {
       where: { id },
       data: {
         nome: dados.nome,
-        instrucoes: dados.instrucoes,
+        descricao: dados.descricao,
         fase: dados.fase,
         nivel: dados.nivel,
         quantidadeSemanas: dados.quantidadeSemanas,

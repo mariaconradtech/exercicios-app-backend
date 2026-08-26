@@ -1,7 +1,3 @@
-// ==========================================
-// Schema do Banco de Dados
-// ==========================================
-
 generator client {
   provider = "prisma-client"
   output   = "../generated/prisma"
@@ -11,9 +7,144 @@ datasource db {
   provider = "postgresql"
 }
 
-// ==========================================
-// ENUMS
-// ==========================================
+model Usuario {
+  id           Int           @id @default(autoincrement())
+  nome         String
+  email        String        @unique
+  token        String?
+  tipo         TipoUsuario   @default(PARTICIPANTE)
+  criadoEm     DateTime      @default(now()) @map("criado_em")
+  atualizadoEm DateTime      @updatedAt @map("atualizado_em")
+  participante Participante?
+  pesquisador  Pesquisador?
+
+  @@map("usuario")
+}
+
+model Participante {
+  id         Int               @id @default(autoincrement())
+  usuarioId  Int               @unique @map("usuario_id")
+  idExterno  String?           @unique @map("id_externo")
+  cpf        String            @unique
+  senha      String
+  dataAdesao DateTime          @default(now()) @map("data_adesao")
+  usuario    Usuario           @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  perfil     PerfilGamificado?
+  sessoes    SessaoTreino[]
+
+  @@map("participante")
+}
+
+model PerfilGamificado {
+  participanteId Int          @id @map("participante_id")
+  avatarGenero   GeneroAvatar @map("avatar_genero")
+  nomeAvatar     String?      @map("nome_avatar")
+  faseAtual      FaseTreino   @default(INICIANTE) @map("fase_atual")
+  nivelAtual     Int          @default(1) @map("nivel_atual")
+  pontos         Int          @default(0)
+  estrelas       Int          @default(0)
+  medalhas       Int          @default(0)
+  trofeus        Int          @default(0)
+  participante   Participante @relation(fields: [participanteId], references: [id], onDelete: Cascade)
+
+  @@map("perfil_gamificado")
+}
+
+model Pesquisador {
+  id           Int         @id @default(autoincrement())
+  usuarioId    Int         @unique @map("usuario_id")
+  universidade String
+  exercicios   Exercicio[]
+  usuario      Usuario     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  treinos      Treino[]
+
+  @@map("pesquisador")
+}
+
+model Categoria {
+  id         Int         @id @default(autoincrement())
+  nome       String      @unique
+  exercicios Exercicio[]
+
+  @@map("categoria")
+}
+
+model Exercicio {
+  id            Int               @id @default(autoincrement())
+  pesquisadorId Int               @map("pesquisador_id")
+  categoriaId   Int               @map("categoria_id")
+  nome          String
+  videoUrl      String            @map("video_url")
+  instrucao     String[]          @map("instrucao")
+  ativo         Boolean           @default(true)
+  categoria     Categoria         @relation(fields: [categoriaId], references: [id])
+  pesquisador   Pesquisador       @relation(fields: [pesquisadorId], references: [id])
+  treinos       TreinoExercicio[]
+  sessoes       SessaoExercicio[]
+
+  @@map("exercicio")
+}
+
+model Treino {
+  id                Int               @id @default(autoincrement())
+  pesquisadorId     Int               @map("pesquisador_id")
+  nome              String
+  descricao         String?
+  fase              FaseTreino
+  nivel             Int
+  quantidadeSemanas Int               @map("quantidade_semanas")
+  ativo             Boolean           @default(true)
+  sessoes           SessaoTreino[]
+  pesquisador       Pesquisador       @relation(fields: [pesquisadorId], references: [id])
+  exercicios        TreinoExercicio[]
+
+  @@map("treino")
+}
+
+model TreinoExercicio {
+  treinoId                Int       @map("treino_id")
+  exercicioId             Int       @map("exercicio_id")
+  ordem                   Int
+  series                  Int
+  descansoSegundos        Int       @map("descanso_segundos")
+  multiplicadorVelocidade Float     @map("multiplicador_velocidade")
+  duracaoEstimadaSegundos Int       @map("duracao_estimada_segundos")
+  exercicio               Exercicio @relation(fields: [exercicioId], references: [id], onDelete: Cascade)
+  treino                  Treino    @relation(fields: [treinoId], references: [id], onDelete: Cascade)
+
+  @@id([treinoId, exercicioId])
+  @@map("treino_exercicio")
+}
+
+model SessaoTreino {
+  id                     Int              @id @default(autoincrement())
+  participanteId         Int              @map("participante_id")
+  treinoId               Int              @map("treino_id")
+  dataInicio             DateTime         @default(now()) @map("data_inicio") @db.Timestamptz(3)
+  dataFim                DateTime?        @map("data_fim") @db.Timestamptz(3)
+  tempoRealizadoSegundos Int?             @map("tempo_realizado_segundos")
+  percentualConcluido    Float            @default(0) @map("percentual_concluido")
+  status                 StatusSessao     @default(EM_ANDAMENTO)
+  esforcoOmni            Int?             @map("esforco_omni")
+  pontosGanhos           Int              @default(0) @map("pontos_ganhos")
+  participante           Participante     @relation(fields: [participanteId], references: [id])
+  treino                 Treino           @relation(fields: [treinoId], references: [id])
+  exercicios             SessaoExercicio[]
+
+  @@map("sessao_treino")
+}
+
+model SessaoExercicio {
+  sessaoId          Int      @map("sessao_id")
+  exercicioId       Int      @map("exercicio_id")
+  seriesConcluidas  Int      @default(0) @map("series_concluidas")
+  concluido         Boolean  @default(false)
+  sessao            SessaoTreino @relation(fields: [sessaoId], references: [id], onDelete: Cascade)
+  exercicio         Exercicio    @relation(fields: [exercicioId], references: [id], onDelete: Cascade)
+
+  @@id([sessaoId, exercicioId])
+  @@map("sessao_exercicio")
+}
 
 enum TipoUsuario {
   PESQUISADOR
@@ -36,158 +167,4 @@ enum StatusSessao {
   CONCLUIDA
   INCOMPLETA
   INTERROMPIDA
-}
-
-// ==========================================
-// MODELOS PRINCIPAIS
-// ==========================================
-
-model Usuario {
-  id           Int         @id @default(autoincrement())
-  nome         String
-  email        String      @unique
-  token        String?
-  tipo         TipoUsuario @default(PARTICIPANTE)
-  criadoEm     DateTime    @default(now()) @map("criado_em")
-  atualizadoEm DateTime    @updatedAt @map("atualizado_em")
-
-  participante Participante?
-  pesquisador  Pesquisador?
-
-  @@map("usuario")
-}
-
-model Participante {
-  id         Int      @id @default(autoincrement())
-  usuarioId  Int      @unique @map("usuario_id")
-  idExterno  String?  @unique @map("id_externo")
-  cpf        String   @unique
-  senha      String   // Definida pelo participante no primeiro acesso
-  dataAdesao DateTime @default(now()) @map("data_adesao")
-
-  usuario Usuario           @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  perfil  PerfilGamificado?
-  sessoes SessaoTreino[]
-
-  @@map("participante")
-}
-
-model PerfilGamificado {
-  participanteId   Int          @id @map("participante_id")
-  avatarGenero     GeneroAvatar @map("avatar_genero")
-  avatarPersonagem String       @map("avatar_personagem")
-  nomeAvatar       String?      @map("nome_avatar")
-  faseAtual        FaseTreino   @default(INICIANTE) @map("fase_atual")
-  nivelAtual       Int          @default(1) @map("nivel_atual")
-  pontos           Int          @default(0)
-  estrelas         Int          @default(0)
-  medalhas         Int          @default(0)
-  trofeus          Int          @default(0)
-
-  participante Participante @relation(fields: [participanteId], references: [id], onDelete: Cascade)
-
-  @@map("perfil_gamificado")
-}
-
-model Pesquisador {
-  id           Int    @id @default(autoincrement())
-  usuarioId    Int    @unique @map("usuario_id")
-  universidade String
-
-  usuario    Usuario     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  exercicios Exercicio[]
-
-  @@map("pesquisador")
-}
-
-model Categoria {
-  id   Int    @id @default(autoincrement())
-  nome String @unique
-
-  exercicios Exercicio[]
-
-  @@map("categoria")
-}
-
-model Exercicio {
-  id            Int      @id @default(autoincrement())
-  pesquisadorId Int      @map("pesquisador_id")
-  categoriaId   Int      @map("categoria_id")
-  nome          String
-  videoUrl      String   @map("video_url")
-  instrucao     String[] @map("instrucao")
-  nivel         Int      @default(1)
-  ativo         Boolean  @default(true)
-  criadoEm      DateTime @default(now()) @map("criado_em")
-
-  pesquisador Pesquisador       @relation(fields: [pesquisadorId], references: [id])
-  categoria   Categoria         @relation(fields: [categoriaId], references: [id])
-  treinos     TreinoExercicio[]
-  progressos  SessaoExercicio[]
-
-  @@map("exercicio")
-}
-
-model Treino {
-  id                          Int        @id @default(autoincrement())
-  nome                        String
-  instrucoes                  String     @db.Text
-  fase                        FaseTreino
-  nivel                       Int
-  quantidadeSemanas           Int        @map("quantidade_semanas")
-  descansoEntreSeriesSegundos Int        @map("descanso_entre_series_segundos")
-  duracaoEstimadaMinutos      Int        @map("duracao_estimada_minutos")
-
-  exercicios TreinoExercicio[]
-  sessoes    SessaoTreino[]
-
-  @@map("treino")
-}
-
-model TreinoExercicio {
-  id                      Int   @id @default(autoincrement())
-  treinoId                Int   @map("treino_id")
-  exercicioId             Int   @map("exercicio_id")
-  series                  Int
-  descansoSegundos        Int   @map("descanso_segundos")
-  multiplicadorVelocidade Float @map("multiplicador_velocidade")
-
-  treino    Treino    @relation(fields: [treinoId], references: [id], onDelete: Cascade)
-  exercicio Exercicio @relation(fields: [exercicioId], references: [id], onDelete: Cascade)
-
-  @@unique([treinoId, exercicioId])
-  @@map("treino_exercicio")
-}
-
-model SessaoTreino {
-  id                     Int          @id @default(autoincrement())
-  participanteId         Int          @map("participante_id")
-  treinoId               Int          @map("treino_id")
-  dataInicio             DateTime     @default(now()) @db.Timestamptz(3) @map("data_inicio")
-  dataFim                DateTime?    @db.Timestamptz(3) @map("data_fim")
-  tempoRealizadoSegundos Int?         @map("tempo_realizado_segundos")
-  percentualConcluido    Float        @default(0) @map("percentual_concluido")
-  status                 StatusSessao @default(EM_ANDAMENTO)
-  esforcoOmni            Int?         @map("esforco_omni")
-  pontosGanhos           Int          @default(0) @map("pontos_ganhos")
-
-  participante Participante @relation(fields: [participanteId], references: [id])
-  treino       Treino       @relation(fields: [treinoId], references: [id])
-  itensProgresso SessaoExercicio[]
-
-  @@map("sessao_treino")
-}
-
-model SessaoExercicio {
-  id               Int     @id @default(autoincrement())
-  sessaoId         Int     @map("sessao_id")
-  exercicioId      Int     @map("exercicio_id")
-  seriesConcluidas Int     @default(0) @map("series_concluidas")
-  concluido        Boolean @default(false)
-
-  sessao    SessaoTreino @relation(fields: [sessaoId], references: [id], onDelete: Cascade)
-  exercicio Exercicio    @relation(fields: [exercicioId], references: [id])
-
-  @@unique([sessaoId, exercicioId])
-  @@map("sessao_exercicio")
 }

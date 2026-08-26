@@ -5,6 +5,8 @@ import cors from 'cors';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, Prisma, StatusSessao } from '../generated/prisma/client';
 
+import { autenticacaoRouter } from './routes/autenticacao';
+import { participantesRouter } from './routes/participantes';
 import { categoriasRouter } from './routes/categorias';
 import { sessoesRouter } from './routes/sessoes';
 import { treinosRouter } from './routes/treinos';
@@ -17,6 +19,8 @@ const prisma = new PrismaClient({ adapter });
 
 const origensPermitidas = [
   'http://localhost:5173',
+  'http://localhost:8081',
+  'http://192.168.0.107:8081',
   ...(process.env.FRONTEND_URL_PRODUCAO ? [process.env.FRONTEND_URL_PRODUCAO] : []),
 ];
 
@@ -36,6 +40,8 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
+app.use(autenticacaoRouter);
+app.use('/participantes', participantesRouter);
 app.use('/treinos', treinosRouter);
 app.use('/sessoes', sessoesRouter);
 app.use('/categorias', categoriasRouter);
@@ -79,6 +85,6 @@ app.use((err: unknown, _req: express.Request, res: express.Response, next: expre
 });
 
 const PORT = Number(process.env.PORT ?? 3000);
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
 });
