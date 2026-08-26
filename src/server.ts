@@ -9,14 +9,22 @@ import { categoriasRouter } from './routes/categorias';
 import { sessoesRouter } from './routes/sessoes';
 import { treinosRouter } from './routes/treinos';
 import { engajamentoRouter } from './routes/engajamento';
-import { categoriasRouter } from './routes/categorias';
 import { exerciciosRouter } from './routes/exercicios';
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const app = express();
 const prisma = new PrismaClient({ adapter });
 
-app.use(cors());
+const origensPermitidas = [
+  'http://localhost:5173',
+  ...(process.env.FRONTEND_URL_PRODUCAO ? [process.env.FRONTEND_URL_PRODUCAO] : []),
+];
+
+app.use(
+  cors({
+    origin: origensPermitidas,
+  }),
+);
 app.use(express.json());
 app.use('/uploads', express.static(path.resolve(__dirname, '..', 'uploads')));
 
@@ -32,7 +40,6 @@ app.use('/treinos', treinosRouter);
 app.use('/sessoes', sessoesRouter);
 app.use('/categorias', categoriasRouter);
 app.use('/engajamento', engajamentoRouter);
-app.use('/categorias', categoriasRouter);
 app.use('/exercicios', exerciciosRouter);
 
 app.post('/avaliacoes', async (req, res) => {
