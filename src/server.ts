@@ -13,7 +13,16 @@ const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const app = express();
 const prisma = new PrismaClient({ adapter });
 
-app.use(cors());
+const origensPermitidas = [
+  'http://localhost:5173',
+  ...(process.env.FRONTEND_URL_PRODUCAO ? [process.env.FRONTEND_URL_PRODUCAO] : []),
+];
+
+app.use(
+  cors({
+    origin: origensPermitidas,
+  }),
+);
 app.use(express.json());
 
 app.get('/', (_req, res) => {

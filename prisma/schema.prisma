@@ -96,7 +96,6 @@ model Pesquisador {
 
   usuario    Usuario     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   exercicios Exercicio[]
-  treinos    Treino[]
 
   @@map("pesquisador")
 }
@@ -128,35 +127,33 @@ model Exercicio {
 }
 
 model Treino {
-  id                Int        @id @default(autoincrement())
-  pesquisadorId     Int        @map("pesquisador_id")
-  nome              String
-  descricao         String?    @db.Text
-  fase              FaseTreino
-  nivel             Int
-  quantidadeSemanas Int        @map("quantidade_semanas")
-  ativo             Boolean    @default(true)
+  id                          Int        @id @default(autoincrement())
+  nome                        String
+  instrucoes                  String     @db.Text
+  fase                        FaseTreino
+  nivel                       Int
+  quantidadeSemanas           Int        @map("quantidade_semanas")
+  descansoEntreSeriesSegundos Int        @map("descanso_entre_series_segundos")
+  duracaoEstimadaMinutos      Int        @map("duracao_estimada_minutos")
 
-  pesquisador Pesquisador       @relation(fields: [pesquisadorId], references: [id])
-  exercicios  TreinoExercicio[]
-  sessoes     SessaoTreino[]
+  exercicios TreinoExercicio[]
+  sessoes    SessaoTreino[]
 
   @@map("treino")
 }
 
 model TreinoExercicio {
+  id                      Int   @id @default(autoincrement())
   treinoId                Int   @map("treino_id")
   exercicioId             Int   @map("exercicio_id")
-  ordem                   Int
   series                  Int
   descansoSegundos        Int   @map("descanso_segundos")
   multiplicadorVelocidade Float @map("multiplicador_velocidade")
-  duracaoEstimadaSegundos Int   @map("duracao_estimada_segundos")
 
   treino    Treino    @relation(fields: [treinoId], references: [id], onDelete: Cascade)
   exercicio Exercicio @relation(fields: [exercicioId], references: [id], onDelete: Cascade)
 
-  @@id([treinoId, exercicioId])
+  @@unique([treinoId, exercicioId])
   @@map("treino_exercicio")
 }
 

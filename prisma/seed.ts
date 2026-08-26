@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { PrismaClient, TipoUsuario, GeneroAvatar, FaseTreino, StatusSessao } from '../generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { calcularDuracaoEstimadaMinutos } from '../src/utils/treino';
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
@@ -127,42 +128,24 @@ async function main() {
   });
 
   // 4. Treino (tela de execução/descanso)
+  const descansoEntreSeriesSegundos = 60;
+  const itensTreino = [
+    { exercicioId: exercicio1.id, series: 3, descansoSegundos: 60, multiplicadorVelocidade: 1.0 },
+    { exercicioId: exercicio2.id, series: 3, descansoSegundos: 90, multiplicadorVelocidade: 1.0 },
+    { exercicioId: exercicio3.id, series: 3, descansoSegundos: 60, multiplicadorVelocidade: 1.0 },
+  ];
+
   const treino = await prisma.treino.create({
     data: {
-      pesquisadorId,
       nome: 'Treino de Força - Semana 1',
-      descricao: 'Treino introdutório de força para iniciantes',
+      instrucoes: 'Treino introdutório de força para iniciantes. Use um tapete e halteres leves.',
       fase: FaseTreino.INICIANTE,
       nivel: 1,
       quantidadeSemanas: 4,
-      ativo: true,
+      descansoEntreSeriesSegundos,
+      duracaoEstimadaMinutos: calcularDuracaoEstimadaMinutos(itensTreino, descansoEntreSeriesSegundos),
       exercicios: {
-        create: [
-          {
-            exercicioId: exercicio1.id,
-            ordem: 1,
-            series: 3,
-            descansoSegundos: 60,
-            multiplicadorVelocidade: 1.0,
-            duracaoEstimadaSegundos: 45,
-          },
-          {
-            exercicioId: exercicio2.id,
-            ordem: 2,
-            series: 3,
-            descansoSegundos: 90,
-            multiplicadorVelocidade: 1.0,
-            duracaoEstimadaSegundos: 60,
-          },
-          {
-            exercicioId: exercicio3.id,
-            ordem: 3,
-            series: 3,
-            descansoSegundos: 60,
-            multiplicadorVelocidade: 1.0,
-            duracaoEstimadaSegundos: 50,
-          },
-        ],
+        create: itensTreino,
       },
     },
   });
