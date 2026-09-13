@@ -74,6 +74,14 @@ sessoesRouter.patch('/:sessaoId/finalizar', async (req, res) => {
       return;
     }
 
+    const sessao = await prisma.sessaoTreino.findUnique({ where: { id: sessaoId } });
+    if (!sessao) {
+      res.status(404).json({ error: 'Sessão não encontrada' });
+      return;
+    }
+
+    const jaConcluida = sessao.status === StatusSessao.CONCLUIDA;
+
     await prisma.sessaoTreino.update({
       where: { id: sessaoId },
       data: {
@@ -81,8 +89,18 @@ sessoesRouter.patch('/:sessaoId/finalizar', async (req, res) => {
         tempoRealizadoSegundos,
         percentualConcluido,
         dataFim: new Date(),
+        ...(status === 'CONCLUIDA' && !jaConcluida ? { pontosGanhos: 10 } : {}),
       },
     });
+
+    if (status === 'CONCLUIDA' && !jaConcluida) {
+      await prisma.perfilGamificado.updateMany({
+        where: { participanteId: sessao.participanteId },
+        data: {
+          pontos: { increment: 10 },
+        },
+      });
+    }
 
     res.status(204).end();
   } catch (error) {

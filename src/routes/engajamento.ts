@@ -101,6 +101,7 @@ engajamentoRouter.get('/', validarPermissaoVisualizarEngajamento, async (req, re
       return {
         participanteId: participante.id,
         nome: participante.usuario.nome,
+        nomeAvatar: participante.perfil?.nomeAvatar?.trim() || participante.usuario.nome,
         perfil: participante.perfil,
         totalConcluidas,
         concluidasJanelaAtual,
@@ -144,7 +145,7 @@ engajamentoRouter.get('/', validarPermissaoVisualizarEngajamento, async (req, re
     const podioCategorias: CategoriaPodio[] = ['OURO', 'PRATA', 'BRONZE'];
     const podio = rankingOrdenado.slice(0, 3).map((item, index) => ({
       categoria: podioCategorias[index] ?? 'BRONZE',
-      participanteNome: item.nome,
+      participanteNome: item.nomeAvatar,
       treinosConcluidos: item.totalConcluidas,
     }));
 
@@ -153,7 +154,8 @@ engajamentoRouter.get('/', validarPermissaoVisualizarEngajamento, async (req, re
 
       return {
         participanteId: item.participanteId,
-        nome: item.nome,
+        nome: item.nomeAvatar,
+        nomeAvatar: item.nomeAvatar,
         bronze: Math.max(0, Math.round(pontosBase * 0.8)),
         estrelas: item.perfil?.estrelas ?? Math.round(item.totalConcluidas * 0.6),
         medalhas: item.perfil?.medalhas ?? Math.round(item.totalConcluidas * 0.45),
