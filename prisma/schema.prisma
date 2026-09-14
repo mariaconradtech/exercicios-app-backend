@@ -89,7 +89,7 @@ model Treino {
   id                Int               @id @default(autoincrement())
   pesquisadorId     Int               @map("pesquisador_id")
   nome              String
-  descricao         String?
+  instrucao         String
   fase              FaseTreino
   nivel             Int
   quantidadeSemanas Int               @map("quantidade_semanas")
