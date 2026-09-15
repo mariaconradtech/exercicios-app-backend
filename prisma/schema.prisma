@@ -56,7 +56,6 @@ model Pesquisador {
   universidade String
   exercicios   Exercicio[]
   usuario      Usuario     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  treinos      Treino[]
 
   @@map("pesquisador")
 }

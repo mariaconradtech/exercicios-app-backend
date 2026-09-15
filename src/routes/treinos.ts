@@ -27,13 +27,12 @@ treinosRouter.get('/participante/:participanteId/ativo', async (req, res) => {
 
     const treino = await prisma.treino.findFirst({
       where: {
-        ativo: true,
         fase: participante.perfil?.faseAtual ?? FaseTreino.INICIANTE,
       },
       include: {
         exercicios: {
           include: { exercicio: true },
-          orderBy: { ordem: 'asc' },
+          orderBy: { id: 'asc' },
         },
       },
       orderBy: { nivel: 'asc' },
@@ -43,6 +42,14 @@ treinosRouter.get('/participante/:participanteId/ativo', async (req, res) => {
       res.status(404).json({ error: 'Nenhum treino ativo encontrado para a fase do participante' });
       return;
     }
+
+    // TODO: lógica mockada temporariamente para manter o contrato da API.
+    // A duração por exercício não representa a regra de negócio oficial e deve ser
+    // substituída por um cálculo real quando a regra for definida.
+    const duracaoEstimadaSegundosPorExercicio = Math.max(
+      1,
+      Math.round((treino.duracaoEstimadaMinutos * 60) / Math.max(1, treino.exercicios.length)),
+    );
 
     res.json({
       id: treino.id,
@@ -56,7 +63,7 @@ treinosRouter.get('/participante/:participanteId/ativo', async (req, res) => {
         series: te.series,
         descansoSegundos: te.descansoSegundos,
         multiplicadorVelocidade: te.multiplicadorVelocidade,
-        duracaoEstimadaSegundos: te.duracaoEstimadaSegundos,
+        duracaoEstimadaSegundos: duracaoEstimadaSegundosPorExercicio,
         exercicio: {
           id: te.exercicio.id,
           nome: te.exercicio.nome,
@@ -79,7 +86,7 @@ treinosRouter.get('/:treinoId/execucao', async (req, res) => {
       include: {
         exercicios: {
           include: { exercicio: true },
-          orderBy: { ordem: 'asc' },
+          orderBy: { id: 'asc' },
         },
       },
     });
@@ -88,6 +95,14 @@ treinosRouter.get('/:treinoId/execucao', async (req, res) => {
       res.status(404).json({ error: 'Treino não encontrado' });
       return;
     }
+
+    // TODO: lógica mockada temporariamente para manter o contrato da API.
+    // A duração por exercício não representa a regra de negócio oficial e deve ser
+    // substituída por um cálculo real quando a regra for definida.
+    const duracaoEstimadaSegundosPorExercicio = Math.max(
+      1,
+      Math.round((treino.duracaoEstimadaMinutos * 60) / Math.max(1, treino.exercicios.length)),
+    );
 
     res.json({
       id: treino.id,
@@ -101,6 +116,7 @@ treinosRouter.get('/:treinoId/execucao', async (req, res) => {
         series: te.series,
         descansoSegundos: te.descansoSegundos,
         multiplicadorVelocidade: te.multiplicadorVelocidade,
+        duracaoEstimadaSegundos: duracaoEstimadaSegundosPorExercicio,
         exercicio: {
           id: te.exercicio.id,
           nome: te.exercicio.nome,
@@ -265,11 +281,16 @@ function formatarTreinoDetalhado(treino: TreinoComExercicios) {
     quantidadeSemanas: treino.quantidadeSemanas,
     descansoEntreSeriesSegundos: treino.descansoEntreSeriesSegundos,
     duracaoEstimadaMinutos: treino.duracaoEstimadaMinutos,
-    exercicios: treino.exercicios.map((item) => ({
+    exercicios: treino.exercicios.map((item, index) => ({
       exercicioId: item.exercicioId,
+      ordem: index + 1,
       series: item.series,
       descansoSegundos: item.descansoSegundos,
       multiplicadorVelocidade: item.multiplicadorVelocidade,
+      duracaoEstimadaSegundos: Math.max(
+        1,
+        Math.round((treino.duracaoEstimadaMinutos * 60) / Math.max(1, treino.exercicios.length)),
+      ),
     })),
   };
 }
