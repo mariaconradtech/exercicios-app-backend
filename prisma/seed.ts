@@ -138,7 +138,7 @@ async function main() {
   const treino = await prisma.treino.create({
     data: {
       nome: 'Treino de Força - Semana 1',
-      instrucao: 'Tapete, Halteres leves, Banco de exercícios',
+      descricao: 'Tapete, Halteres leves, Banco de exercícios',
       fase: FaseTreino.INICIANTE,
       nivel: 1,
       quantidadeSemanas: 4,

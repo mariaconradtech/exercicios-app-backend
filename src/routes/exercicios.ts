@@ -62,7 +62,7 @@ exerciciosRouter.get('/:id', async (req, res) => {
 
 exerciciosRouter.post('/', uploadVideo.single('video'), async (req, res) => {
   try {
-    const { nome, categoriaId } = req.body as { nome?: string; categoriaId?: string };
+    const { nome, categoriaId, nivel } = req.body as { nome?: string; categoriaId?: string; nivel?: string };
 
     if (!nome || !nome.trim()) {
       res.status(400).json({ error: 'nome é obrigatório' });
@@ -85,6 +85,7 @@ exerciciosRouter.post('/', uploadVideo.single('video'), async (req, res) => {
         pesquisadorId,
         categoriaId: Number(categoriaId),
         nome: nome.trim(),
+        nivel: nivel ? Number(nivel) : 1,
         videoUrl,
         instrucao: parseInstrucao(req.body.instrucao),
       },
@@ -103,7 +104,7 @@ exerciciosRouter.post('/', uploadVideo.single('video'), async (req, res) => {
 exerciciosRouter.patch('/:id', uploadVideo.single('video'), async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const { nome, categoriaId } = req.body as { nome?: string; categoriaId?: string };
+    const { nome, categoriaId, nivel } = req.body as { nome?: string; categoriaId?: string; nivel?: string };
 
     const existente = await prisma.exercicio.findUnique({ where: { id } });
     if (!existente) {
@@ -122,6 +123,7 @@ exerciciosRouter.patch('/:id', uploadVideo.single('video'), async (req, res) => 
       data: {
         ...(nome ? { nome: nome.trim() } : {}),
         ...(categoriaId ? { categoriaId: Number(categoriaId) } : {}),
+        ...(nivel ? { nivel: Number(nivel) } : {}),
         ...(req.body.instrucao !== undefined ? { instrucao: parseInstrucao(req.body.instrucao) } : {}),
         videoUrl,
       },
