@@ -45,48 +45,43 @@ autenticacaoRouter.post('/login', async (req, res) => {
   }
 });
 
+function senhaAtendeRegra(senha: string): boolean {
+  return senha.length >= 8 && /[a-zA-Z]/.test(senha) && /[0-9]/.test(senha);
+}
+
 autenticacaoRouter.patch('/senha', async (req, res) => {
   try {
-    const { email, senhaAtual, senhaNova } = req.body as {
-      email?: string;
-      senhaAtual?: string;
-      senhaNova?: string;
-    };
+    const { cpf, novaSenha } = req.body as { cpf?: string; novaSenha?: string };
 
-    if (!email || typeof email !== 'string' || !email.trim()) {
-      return res.status(400).json({ error: 'Email é obrigatório' });
+    if (!cpf || typeof cpf !== 'string' || !cpf.trim()) {
+      return res.status(400).json({ error: 'CPF é obrigatório' });
     }
 
-    if (!senhaAtual || typeof senhaAtual !== 'string' || !senhaAtual.trim()) {
-      return res.status(400).json({ error: 'Senha atual é obrigatória' });
-    }
-
-    if (!senhaNova || typeof senhaNova !== 'string' || !senhaNova.trim()) {
+    if (!novaSenha || typeof novaSenha !== 'string' || !novaSenha.trim()) {
       return res.status(400).json({ error: 'Nova senha é obrigatória' });
     }
 
-    const usuario = await prisma.usuario.findUnique({
-      where: { email: email.trim() },
-      include: { participante: true },
-    });
-
-    if (!usuario || !usuario.participante) {
-      return res.status(401).json({ error: 'Email ou senha inválidos' });
+    if (!senhaAtendeRegra(novaSenha)) {
+      return res
+        .status(400)
+        .json({ error: 'A senha deve ter pelo menos 8 caracteres, com letras e números' });
     }
 
-    // TODO: Implementar verificação de senha com bcrypt
-    // const senhaValida = await bcrypt.compare(senhaAtual, usuario.participante.senha);
-    // if (!senhaValida) {
-    //   return res.status(401).json({ error: 'Senha atual inválida' });
-    // }
+    const cpfNormalizado = cpf.replace(/\D/g, '');
+
+    const participante = await prisma.participante.findUnique({
+      where: { cpf: cpfNormalizado },
+    });
+
+    if (!participante) {
+      return res.status(404).json({ error: 'CPF não encontrado' });
+    }
 
     // TODO: Hash da nova senha com bcrypt
-    // const senhaCriptografada = await bcrypt.hash(senhaNova, 10);
-
-    // await prisma.participante.update({
-    //   where: { usuarioId: usuario.id },
-    //   data: { senha: senhaCriptografada },
-    // });
+    await prisma.participante.update({
+      where: { cpf: cpfNormalizado },
+      data: { senha: novaSenha },
+    });
 
     res.json({ message: 'Senha atualizada com sucesso' });
   } catch (error) {
