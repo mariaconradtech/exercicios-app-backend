@@ -27,12 +27,13 @@ treinosRouter.get('/participante/:participanteId/ativo', async (req, res) => {
 
     const treino = await prisma.treino.findFirst({
       where: {
+        ativo: true,
         fase: participante.perfil?.faseAtual ?? FaseTreino.INICIANTE,
       },
       include: {
         exercicios: {
           include: { exercicio: true },
-          orderBy: { id: 'asc' },
+          orderBy: { ordem: 'asc' },
         },
       },
       orderBy: { nivel: 'asc' },
@@ -57,9 +58,9 @@ treinosRouter.get('/participante/:participanteId/ativo', async (req, res) => {
       instrucao: treino.instrucao,
       fase: treino.fase,
       nivel: treino.nivel,
-      itens: treino.exercicios.map((te, index) => ({
+      itens: treino.exercicios.map((te) => ({
         exercicioId: te.exercicioId,
-        ordem: index + 1,
+        ordem: te.ordem,
         series: te.series,
         descansoSegundos: te.descansoSegundos,
         multiplicadorVelocidade: te.multiplicadorVelocidade,
@@ -86,7 +87,7 @@ treinosRouter.get('/:treinoId/execucao', async (req, res) => {
       include: {
         exercicios: {
           include: { exercicio: true },
-          orderBy: { id: 'asc' },
+          orderBy: { ordem: 'asc' },
         },
       },
     });
@@ -110,9 +111,9 @@ treinosRouter.get('/:treinoId/execucao', async (req, res) => {
       instrucao: treino.instrucao,
       fase: treino.fase,
       nivel: treino.nivel,
-      itens: treino.exercicios.map((te, index) => ({
+      itens: treino.exercicios.map((te) => ({
         exercicioId: te.exercicioId,
-        ordem: index + 1,
+        ordem: te.ordem,
         series: te.series,
         descansoSegundos: te.descansoSegundos,
         multiplicadorVelocidade: te.multiplicadorVelocidade,
@@ -136,6 +137,7 @@ treinosRouter.get('/:treinoId/execucao', async (req, res) => {
 
 type ItemTreinoExercicioEntrada = {
   exercicioId: number;
+  ordem: number;
   series: number;
   descansoSegundos: number;
   multiplicadorVelocidade: number;
@@ -217,10 +219,16 @@ function validarRequisicaoTreino(body: unknown): { dados: TreinoEntradaValidada 
       return { erro: `O exercício na posição ${indice} de 'exercicios' é inválido.` };
     }
 
-    const { exercicioId, series, descansoSegundos, multiplicadorVelocidade } = item as Record<string, unknown>;
+    const { exercicioId, ordem, series, descansoSegundos, multiplicadorVelocidade } = item as Record<string, unknown>;
 
     if (!ehInteiro(exercicioId)) {
       return { erro: `O campo 'exercicioId' do exercício na posição ${indice} é obrigatório e deve ser um número inteiro.` };
+    }
+
+    if (!ehInteiro(ordem) || ordem <= 0) {
+      return {
+        erro: `O campo 'ordem' do exercício na posição ${indice} é obrigatório e deve ser um número inteiro maior que zero.`,
+      };
     }
 
     if (!ehInteiro(series) || series <= 0) {
@@ -246,7 +254,7 @@ function validarRequisicaoTreino(body: unknown): { dados: TreinoEntradaValidada 
     }
     idsVistos.add(exercicioId);
 
-    itensValidados.push({ exercicioId, series, descansoSegundos, multiplicadorVelocidade });
+    itensValidados.push({ exercicioId, ordem, series, descansoSegundos, multiplicadorVelocidade });
   }
 
   return {
@@ -281,9 +289,9 @@ function formatarTreinoDetalhado(treino: TreinoComExercicios) {
     quantidadeSemanas: treino.quantidadeSemanas,
     descansoEntreSeriesSegundos: treino.descansoEntreSeriesSegundos,
     duracaoEstimadaMinutos: treino.duracaoEstimadaMinutos,
-    exercicios: treino.exercicios.map((item, index) => ({
+    exercicios: treino.exercicios.map((item) => ({
       exercicioId: item.exercicioId,
-      ordem: index + 1,
+      ordem: item.ordem,
       series: item.series,
       descansoSegundos: item.descansoSegundos,
       multiplicadorVelocidade: item.multiplicadorVelocidade,
