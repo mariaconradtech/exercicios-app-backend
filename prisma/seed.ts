@@ -130,20 +130,21 @@ async function main() {
   // 4. Treino (tela de execução/descanso)
   const descansoEntreSeriesSegundos = 60;
   const itensTreino = [
-    { exercicioId: exercicio1.id, series: 3, descansoSegundos: 60, multiplicadorVelocidade: 1.0 },
-    { exercicioId: exercicio2.id, series: 3, descansoSegundos: 90, multiplicadorVelocidade: 1.0 },
-    { exercicioId: exercicio3.id, series: 3, descansoSegundos: 60, multiplicadorVelocidade: 1.0 },
+    { exercicioId: exercicio1.id, ordem: 1, series: 3, descansoSegundos: 60, multiplicadorVelocidade: 1.0 },
+    { exercicioId: exercicio2.id, ordem: 2, series: 3, descansoSegundos: 90, multiplicadorVelocidade: 1.0 },
+    { exercicioId: exercicio3.id, ordem: 3, series: 3, descansoSegundos: 60, multiplicadorVelocidade: 1.0 },
   ];
 
   const treino = await prisma.treino.create({
     data: {
       nome: 'Treino de Força - Semana 1',
-      descricao: 'Tapete, Halteres leves, Banco de exercícios',
+      instrucao: 'Tapete, Halteres leves, Banco de exercícios',
       fase: FaseTreino.INICIANTE,
       nivel: 1,
       quantidadeSemanas: 4,
       descansoEntreSeriesSegundos,
       duracaoEstimadaMinutos: calcularDuracaoEstimadaMinutos(itensTreino, descansoEntreSeriesSegundos),
+      ativo: true,
       exercicios: {
         create: itensTreino,
       },

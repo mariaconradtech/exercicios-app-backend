@@ -72,7 +72,7 @@ function categoriaPorFrequencia(totalTreinos: number): CategoriaPodio {
   return 'BRONZE';
 }
 
-function objetivoPorFase(fase: FaseTreino): number {
+export function objetivoPorFase(fase: FaseTreino): number {
   if (fase === FaseTreino.INICIANTE) {
     return 10;
   }
@@ -84,7 +84,7 @@ function objetivoPorFase(fase: FaseTreino): number {
   return 30;
 }
 
-function proximaFase(fase: FaseTreino): FaseTreino | null {
+export function proximaFase(fase: FaseTreino): FaseTreino | null {
   if (fase === FaseTreino.INICIANTE) {
     return FaseTreino.INTERMEDIARIO;
   }

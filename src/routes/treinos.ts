@@ -44,19 +44,27 @@ treinosRouter.get('/participante/:participanteId/ativo', async (req, res) => {
       return;
     }
 
+    // TODO: lógica mockada temporariamente para manter o contrato da API.
+    // A duração por exercício não representa a regra de negócio oficial e deve ser
+    // substituída por um cálculo real quando a regra for definida.
+    const duracaoEstimadaSegundosPorExercicio = Math.max(
+      1,
+      Math.round((treino.duracaoEstimadaMinutos * 60) / Math.max(1, treino.exercicios.length)),
+    );
+
     res.json({
       id: treino.id,
       nome: treino.nome,
-      descricao: treino.descricao,
+      instrucao: treino.instrucao,
       fase: treino.fase,
       nivel: treino.nivel,
-      itens: treino.exercicios.map((te, index) => ({
+      itens: treino.exercicios.map((te) => ({
         exercicioId: te.exercicioId,
-        ordem: index + 1,
+        ordem: te.ordem,
         series: te.series,
         descansoSegundos: te.descansoSegundos,
         multiplicadorVelocidade: te.multiplicadorVelocidade,
-        duracaoEstimadaSegundos: te.duracaoEstimadaSegundos,
+        duracaoEstimadaSegundos: duracaoEstimadaSegundosPorExercicio,
         exercicio: {
           id: te.exercicio.id,
           nome: te.exercicio.nome,
@@ -89,18 +97,27 @@ treinosRouter.get('/:treinoId/execucao', async (req, res) => {
       return;
     }
 
+    // TODO: lógica mockada temporariamente para manter o contrato da API.
+    // A duração por exercício não representa a regra de negócio oficial e deve ser
+    // substituída por um cálculo real quando a regra for definida.
+    const duracaoEstimadaSegundosPorExercicio = Math.max(
+      1,
+      Math.round((treino.duracaoEstimadaMinutos * 60) / Math.max(1, treino.exercicios.length)),
+    );
+
     res.json({
       id: treino.id,
       nome: treino.nome,
-      descricao: treino.descricao,
+      instrucao: treino.instrucao,
       fase: treino.fase,
       nivel: treino.nivel,
-      itens: treino.exercicios.map((te, index) => ({
+      itens: treino.exercicios.map((te) => ({
         exercicioId: te.exercicioId,
-        ordem: index + 1,
+        ordem: te.ordem,
         series: te.series,
         descansoSegundos: te.descansoSegundos,
         multiplicadorVelocidade: te.multiplicadorVelocidade,
+        duracaoEstimadaSegundos: duracaoEstimadaSegundosPorExercicio,
         exercicio: {
           id: te.exercicio.id,
           nome: te.exercicio.nome,
@@ -120,6 +137,7 @@ treinosRouter.get('/:treinoId/execucao', async (req, res) => {
 
 type ItemTreinoExercicioEntrada = {
   exercicioId: number;
+  ordem: number;
   series: number;
   descansoSegundos: number;
   multiplicadorVelocidade: number;
@@ -127,7 +145,7 @@ type ItemTreinoExercicioEntrada = {
 
 type TreinoEntradaValidada = {
   nome: string;
-  descricao: string;
+  instrucao: string;
   fase: FaseTreino;
   nivel: number;
   quantidadeSemanas: number;
@@ -154,15 +172,15 @@ function validarRequisicaoTreino(body: unknown): { dados: TreinoEntradaValidada 
     return { erro: 'Corpo da requisição inválido.' };
   }
 
-  const { nome, descricao, fase, nivel, quantidadeSemanas, descansoEntreSeriesSegundos, exercicios } =
+  const { nome, instrucao, fase, nivel, quantidadeSemanas, descansoEntreSeriesSegundos, exercicios } =
     body as Record<string, unknown>;
 
   if (typeof nome !== 'string' || !nome.trim()) {
     return { erro: "O campo 'nome' é obrigatório." };
   }
 
-  if (typeof descricao !== 'string' || !descricao.trim()) {
-    return { erro: "O campo 'descricao' é obrigatório." };
+  if (typeof instrucao !== 'string' || !instrucao.trim()) {
+    return { erro: "O campo 'instrucao' é obrigatório." };
   }
 
   if (typeof fase !== 'string' || !fase.trim()) {
@@ -201,10 +219,16 @@ function validarRequisicaoTreino(body: unknown): { dados: TreinoEntradaValidada 
       return { erro: `O exercício na posição ${indice} de 'exercicios' é inválido.` };
     }
 
-    const { exercicioId, series, descansoSegundos, multiplicadorVelocidade } = item as Record<string, unknown>;
+    const { exercicioId, ordem, series, descansoSegundos, multiplicadorVelocidade } = item as Record<string, unknown>;
 
     if (!ehInteiro(exercicioId)) {
       return { erro: `O campo 'exercicioId' do exercício na posição ${indice} é obrigatório e deve ser um número inteiro.` };
+    }
+
+    if (!ehInteiro(ordem) || ordem <= 0) {
+      return {
+        erro: `O campo 'ordem' do exercício na posição ${indice} é obrigatório e deve ser um número inteiro maior que zero.`,
+      };
     }
 
     if (!ehInteiro(series) || series <= 0) {
@@ -230,13 +254,13 @@ function validarRequisicaoTreino(body: unknown): { dados: TreinoEntradaValidada 
     }
     idsVistos.add(exercicioId);
 
-    itensValidados.push({ exercicioId, series, descansoSegundos, multiplicadorVelocidade });
+    itensValidados.push({ exercicioId, ordem, series, descansoSegundos, multiplicadorVelocidade });
   }
 
   return {
     dados: {
       nome: nome.trim(),
-      descricao: descricao.trim(),
+      instrucao: instrucao.trim(),
       fase: faseEnum,
       nivel,
       quantidadeSemanas,
@@ -259,7 +283,7 @@ function formatarTreinoDetalhado(treino: TreinoComExercicios) {
   return {
     id: treino.id,
     nome: treino.nome,
-    descricao: treino.descricao,
+    instrucao: treino.instrucao,
     fase: faseParaLabel(treino.fase),
     nivel: treino.nivel,
     quantidadeSemanas: treino.quantidadeSemanas,
@@ -267,9 +291,14 @@ function formatarTreinoDetalhado(treino: TreinoComExercicios) {
     duracaoEstimadaMinutos: treino.duracaoEstimadaMinutos,
     exercicios: treino.exercicios.map((item) => ({
       exercicioId: item.exercicioId,
+      ordem: item.ordem,
       series: item.series,
       descansoSegundos: item.descansoSegundos,
       multiplicadorVelocidade: item.multiplicadorVelocidade,
+      duracaoEstimadaSegundos: Math.max(
+        1,
+        Math.round((treino.duracaoEstimadaMinutos * 60) / Math.max(1, treino.exercicios.length)),
+      ),
     })),
   };
 }
@@ -363,7 +392,7 @@ treinosRouter.post('/', async (req, res) => {
     const treinoCriado = await prisma.treino.create({
       data: {
         nome: dados.nome,
-        descricao: dados.descricao,
+        instrucao: dados.instrucao,
         fase: dados.fase,
         nivel: dados.nivel,
         quantidadeSemanas: dados.quantidadeSemanas,
@@ -413,7 +442,7 @@ treinosRouter.put('/:id', async (req, res) => {
       where: { id },
       data: {
         nome: dados.nome,
-        descricao: dados.descricao,
+        instrucao: dados.instrucao,
         fase: dados.fase,
         nivel: dados.nivel,
         quantidadeSemanas: dados.quantidadeSemanas,
