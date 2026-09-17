@@ -73,7 +73,7 @@ function calcularFaseNivelAtual(sessoesPorNivel: Map<string, SessaoGamificacao[]
   faseAtual: FaseTreino;
   nivelAtual: number;
 } {
-  let faseAtual = FaseTreino.INICIANTE;
+  let faseAtual: FaseTreino = FaseTreino.INICIANTE;
   let nivelAtual = 1;
 
   for (const fase of FASES) {
