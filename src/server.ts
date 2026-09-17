@@ -12,6 +12,7 @@ import { sessoesRouter } from './routes/sessoes';
 import { treinosRouter } from './routes/treinos';
 import { engajamentoRouter } from './routes/engajamento';
 import { exerciciosRouter } from './routes/exercicios';
+import { recalcularGamificacaoParticipante } from './services/gamificacao';
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const app = express();
@@ -49,21 +50,65 @@ app.use('/engajamento', engajamentoRouter);
 app.use('/exercicios', exerciciosRouter);
 
 app.post('/avaliacoes', async (req, res) => {
-  const { sessaoId, rating } = req.body;
+  const { sessaoId, rating } = req.body as { sessaoId?: unknown; rating?: unknown };
+  const sessaoIdNumerico = typeof sessaoId === 'string' ? Number(sessaoId) : sessaoId;
+  const ratingNumerico = typeof rating === 'string' ? Number(rating) : rating;
 
-  if (typeof sessaoId !== 'number' || Number.isNaN(sessaoId)) {
-    return res.status(400).json({ error: 'sessaoId é obrigatório e deve ser um número' });
+  if (
+    typeof sessaoIdNumerico !== 'number' ||
+    !Number.isInteger(sessaoIdNumerico) ||
+    sessaoIdNumerico <= 0
+  ) {
+    return res.status(400).json({ error: 'sessaoId é obrigatório e deve ser um número inteiro positivo' });
   }
 
-  if (typeof rating !== 'number' || rating < 0 || rating > 10) {
-    return res.status(400).json({ error: 'rating deve ser um número entre 0 e 10' });
+  if (
+    typeof ratingNumerico !== 'number' ||
+    !Number.isInteger(ratingNumerico) ||
+    ratingNumerico < 0 ||
+    ratingNumerico > 10
+  ) {
+    return res.status(400).json({ error: 'rating deve ser um número inteiro entre 0 e 10' });
   }
 
   try {
-    await prisma.sessaoTreino.update({
-      where: { id: sessaoId },
-      data: {
-        esforcoOmni: rating,
+    const sessao = await prisma.sessaoTreino.findUnique({
+      where: { id: sessaoIdNumerico },
+    });
+
+    if (!sessao) {
+      return res.status(404).json({ error: 'Sessão não encontrada' });
+    }
+
+    const gamificacao = await prisma.$transaction(async (tx) => {
+      const statusFinal =
+        sessao.status === StatusSessao.INTERROMPIDA ? StatusSessao.INTERROMPIDA : StatusSessao.CONCLUIDA;
+
+      await tx.sessaoTreino.update({
+        where: { id: sessaoIdNumerico },
+        data: {
+          esforcoOmni: ratingNumerico,
+          status: statusFinal,
+          dataFim: sessao.dataFim ?? new Date(),
+          ...(statusFinal === StatusSessao.CONCLUIDA && sessao.percentualConcluido < 100
+            ? { percentualConcluido: 100 }
+            : {}),
+        },
+      });
+
+      return recalcularGamificacaoParticipante(tx, sessao.participanteId);
+    });
+
+    return res.status(200).json({
+      message: 'Avaliação salva com sucesso',
+      gamificacao: {
+        faseAtual: gamificacao.faseAtual,
+        nivelAtual: gamificacao.nivelAtual,
+        pontos: gamificacao.pontos,
+        estrelas: gamificacao.estrelas,
+        medalhas: gamificacao.medalhas,
+        trofeus: gamificacao.trofeus,
+        pontosGanhosSessao: gamificacao.pontosPorSessao.get(sessaoIdNumerico) ?? 0,
       },
     });
   } catch (error) {
@@ -72,8 +117,6 @@ app.post('/avaliacoes', async (req, res) => {
     }
     throw error;
   }
-
-  return res.status(200).json({ message: 'Avaliação salva com sucesso' });
 });
 
 app.use((err: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {

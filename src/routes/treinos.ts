@@ -2,7 +2,13 @@ import { Router, type Response } from 'express';
 
 import { prisma } from '../prismaClient';
 import { Prisma, FaseTreino } from '../../generated/prisma/client';
-import { calcularDuracaoEstimadaMinutos, faseParaLabel, labelParaFase, NIVEIS_VALIDOS } from '../utils/treino';
+import {
+  calcularDuracaoEstimadaMinutos,
+  calcularDuracaoExercicioSegundos,
+  faseParaLabel,
+  labelParaFase,
+  NIVEIS_VALIDOS,
+} from '../utils/treino';
 
 export const treinosRouter = Router();
 
@@ -44,27 +50,20 @@ treinosRouter.get('/participante/:participanteId/ativo', async (req, res) => {
       return;
     }
 
-    // TODO: lógica mockada temporariamente para manter o contrato da API.
-    // A duração por exercício não representa a regra de negócio oficial e deve ser
-    // substituída por um cálculo real quando a regra for definida.
-    const duracaoEstimadaSegundosPorExercicio = Math.max(
-      1,
-      Math.round((treino.duracaoEstimadaMinutos * 60) / Math.max(1, treino.exercicios.length)),
-    );
-
     res.json({
       id: treino.id,
       nome: treino.nome,
       instrucao: treino.instrucao,
       fase: treino.fase,
       nivel: treino.nivel,
+      duracaoEstimadaMinutos: treino.duracaoEstimadaMinutos,
       itens: treino.exercicios.map((te) => ({
         exercicioId: te.exercicioId,
         ordem: te.ordem,
         series: te.series,
         descansoSegundos: te.descansoSegundos,
         multiplicadorVelocidade: te.multiplicadorVelocidade,
-        duracaoEstimadaSegundos: duracaoEstimadaSegundosPorExercicio,
+        duracaoEstimadaSegundos: calcularDuracaoExercicioSegundos(te),
         exercicio: {
           id: te.exercicio.id,
           nome: te.exercicio.nome,
@@ -97,27 +96,20 @@ treinosRouter.get('/:treinoId/execucao', async (req, res) => {
       return;
     }
 
-    // TODO: lógica mockada temporariamente para manter o contrato da API.
-    // A duração por exercício não representa a regra de negócio oficial e deve ser
-    // substituída por um cálculo real quando a regra for definida.
-    const duracaoEstimadaSegundosPorExercicio = Math.max(
-      1,
-      Math.round((treino.duracaoEstimadaMinutos * 60) / Math.max(1, treino.exercicios.length)),
-    );
-
     res.json({
       id: treino.id,
       nome: treino.nome,
       instrucao: treino.instrucao,
       fase: treino.fase,
       nivel: treino.nivel,
+      duracaoEstimadaMinutos: treino.duracaoEstimadaMinutos,
       itens: treino.exercicios.map((te) => ({
         exercicioId: te.exercicioId,
         ordem: te.ordem,
         series: te.series,
         descansoSegundos: te.descansoSegundos,
         multiplicadorVelocidade: te.multiplicadorVelocidade,
-        duracaoEstimadaSegundos: duracaoEstimadaSegundosPorExercicio,
+        duracaoEstimadaSegundos: calcularDuracaoExercicioSegundos(te),
         exercicio: {
           id: te.exercicio.id,
           nome: te.exercicio.nome,
@@ -295,10 +287,7 @@ function formatarTreinoDetalhado(treino: TreinoComExercicios) {
       series: item.series,
       descansoSegundos: item.descansoSegundos,
       multiplicadorVelocidade: item.multiplicadorVelocidade,
-      duracaoEstimadaSegundos: Math.max(
-        1,
-        Math.round((treino.duracaoEstimadaMinutos * 60) / Math.max(1, treino.exercicios.length)),
-      ),
+      duracaoEstimadaSegundos: calcularDuracaoExercicioSegundos(item),
     })),
   };
 }
