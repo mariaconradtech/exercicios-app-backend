@@ -292,11 +292,10 @@ engajamentoRouter.get('/', validarPermissaoVisualizarEngajamento, async (req, re
     );
 
     const historicoEsforco = participanteAtual.sessoesConcluidas
-      .filter((sessao) => typeof sessao.esforcoOmni === 'number')
       .slice(-10)
       .map((sessao) => ({
         data: formatarDataCurta(sessao.dataInicio),
-        valor: sessao.esforcoOmni as number,
+        valor: typeof sessao.esforcoOmni === 'number' ? sessao.esforcoOmni : 0,
       }));
 
     const podioCategorias: CategoriaPodio[] = ['OURO', 'PRATA', 'BRONZE'];
