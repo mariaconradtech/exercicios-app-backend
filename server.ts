@@ -10,6 +10,7 @@ import { participantesRouter } from './src/routes/participantes';
 import { treinosRouter } from './src/routes/treinos';
 import { sessoesRouter } from './src/routes/sessoes';
 import { StatusSessao } from './generated/prisma/client';
+import { recalcularGamificacaoParticipante } from './src/services/gamificacao';
 
 const app = express();
 const port = Number(process.env.PORT ?? 3000);
@@ -28,11 +29,10 @@ app.use('/sessoes', sessoesRouter);
 
 app.post('/avaliacoes', async (req, res) => {
   try {
-    const { rating, sessionId, participanteId, treinoId } = req.body as {
+    const { rating, sessaoId, sessionId } = req.body as {
       rating?: unknown;
+      sessaoId?: unknown;
       sessionId?: unknown;
-      participanteId?: unknown;
-      treinoId?: unknown;
     };
 
     const parseInteger = (value: unknown) => {
@@ -48,52 +48,50 @@ app.post('/avaliacoes', async (req, res) => {
         .json({ error: 'A nota do feedback deve ser um numero inteiro entre 0 e 10.' });
     }
 
-    const sessionIdNum = parseInteger(sessionId);
-    const participanteIdNum = parseInteger(participanteId);
-    const treinoIdNum = parseInteger(treinoId);
+    const sessaoIdNum = parseInteger(sessaoId ?? sessionId);
 
-    let sessao;
-
-    if (sessionIdNum !== null) {
-      sessao = await prisma.sessaoTreino.findUnique({ where: { id: sessionIdNum } });
-    } else if (participanteIdNum !== null && treinoIdNum !== null) {
-      sessao = await prisma.sessaoTreino.findFirst({
-        where: { participanteId: participanteIdNum, treinoId: treinoIdNum },
-        orderBy: { dataInicio: 'desc' },
+    if (sessaoIdNum === null || sessaoIdNum <= 0) {
+      return res.status(400).json({
+        error: 'sessaoId e obrigatorio e deve ser um numero inteiro positivo.',
       });
     }
 
+    const sessao = await prisma.sessaoTreino.findUnique({ where: { id: sessaoIdNum } });
     if (!sessao) {
-      if (participanteIdNum === null || treinoIdNum === null) {
-        return res.status(400).json({
-          error: 'Parametros invalidos. Envie sessionId, participanteId e treinoId.',
-        });
-      }
+      return res.status(404).json({ error: 'Sessao nao encontrada.' });
+    }
 
-      const criada = await prisma.sessaoTreino.create({
+    const gamificacao = await prisma.$transaction(async (tx) => {
+      const statusFinal =
+        sessao.status === StatusSessao.INTERROMPIDA ? StatusSessao.INTERROMPIDA : StatusSessao.CONCLUIDA;
+
+      await tx.sessaoTreino.update({
+        where: { id: sessao.id },
         data: {
-          participanteId: participanteIdNum,
-          treinoId: treinoIdNum,
-          status: StatusSessao.CONCLUIDA,
-          dataFim: new Date(),
-          percentualConcluido: 100,
           esforcoOmni: ratingNum,
+          status: statusFinal,
+          dataFim: sessao.dataFim ?? new Date(),
+          ...(statusFinal === StatusSessao.CONCLUIDA && sessao.percentualConcluido < 100
+            ? { percentualConcluido: 100 }
+            : {}),
         },
       });
 
-      return res.status(201).json({ message: 'Feedback salvo com sucesso.', sessao: criada });
-    }
-
-    const atualizada = await prisma.sessaoTreino.update({
-      where: { id: sessao.id },
-      data: {
-        esforcoOmni: ratingNum,
-        status: StatusSessao.CONCLUIDA,
-        dataFim: sessao.dataFim ?? new Date(),
-      },
+      return recalcularGamificacaoParticipante(tx, sessao.participanteId);
     });
 
-    res.status(200).json({ message: 'Feedback salvo com sucesso.', sessao: atualizada });
+    res.status(200).json({
+      message: 'Feedback salvo com sucesso.',
+      gamificacao: {
+        faseAtual: gamificacao.faseAtual,
+        nivelAtual: gamificacao.nivelAtual,
+        pontos: gamificacao.pontos,
+        estrelas: gamificacao.estrelas,
+        medalhas: gamificacao.medalhas,
+        trofeus: gamificacao.trofeus,
+        pontosGanhosSessao: gamificacao.pontosPorSessao.get(sessao.id) ?? 0,
+      },
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Falha ao salvar feedback.' });

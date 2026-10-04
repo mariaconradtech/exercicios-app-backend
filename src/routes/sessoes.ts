@@ -80,8 +80,6 @@ sessoesRouter.patch('/:sessaoId/finalizar', async (req, res) => {
       return;
     }
 
-    const jaConcluida = sessao.status === StatusSessao.CONCLUIDA;
-
     await prisma.sessaoTreino.update({
       where: { id: sessaoId },
       data: {
@@ -89,18 +87,8 @@ sessoesRouter.patch('/:sessaoId/finalizar', async (req, res) => {
         tempoRealizadoSegundos,
         percentualConcluido,
         dataFim: new Date(),
-        ...(status === 'CONCLUIDA' && !jaConcluida ? { pontosGanhos: 10 } : {}),
       },
     });
-
-    if (status === 'CONCLUIDA' && !jaConcluida) {
-      await prisma.perfilGamificado.updateMany({
-        where: { participanteId: sessao.participanteId },
-        data: {
-          pontos: { increment: 10 },
-        },
-      });
-    }
 
     res.status(204).end();
   } catch (error) {
