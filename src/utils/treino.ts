@@ -23,6 +23,7 @@ export const NIVEIS_VALIDOS = [1, 2] as const;
 type ItemDuracao = {
   series: number;
   descansoSegundos: number;
+  descansoTransicaoSegundos: number;
   multiplicadorVelocidade: number;
 };
 
@@ -31,12 +32,16 @@ type ItemDuracao = {
  * A entidade Exercicio não guarda tempo/repetições, então usamos uma constante
  * ajustável até existir um dado mais preciso vindo do cadastro de exercícios.
  */
-const TEMPO_BASE_SEGUNDOS_POR_SERIE = 10;
+export const TEMPO_BASE_SEGUNDOS_POR_SERIE = 40;
 
-export function calcularDuracaoExercicioSegundos(item: ItemDuracao): number {
-  const tempoExecucaoSegundos = (item.series * TEMPO_BASE_SEGUNDOS_POR_SERIE) / item.multiplicadorVelocidade;
-  const descansoProprioSegundos = item.descansoSegundos * Math.max(item.series - 1, 0);
-  return Math.max(1, Math.round(tempoExecucaoSegundos + descansoProprioSegundos));
+/**
+ * Duração de uma única série de um exercício ("Tempo de Série" cadastrado
+ * pelo pesquisador), derivada do multiplicador de velocidade salvo em
+ * TreinoExercicio. É o mesmo valor usado na tela de execução do participante
+ * (TreinoExercicioDTO.duracaoEstimadaSegundos).
+ */
+export function duracaoSerieSegundos(multiplicadorVelocidade: number): number {
+  return Math.max(1, Math.round(TEMPO_BASE_SEGUNDOS_POR_SERIE / multiplicadorVelocidade));
 }
 
 /**
@@ -45,21 +50,17 @@ export function calcularDuracaoExercicioSegundos(item: ItemDuracao): number {
  * Para cada exercício: tempo de execução das séries (ajustado pelo
  * multiplicador de velocidade) + descanso entre as séries daquele exercício
  * (`descansoSegundos`, aplicado `series - 1` vezes).
- * Entre exercícios distintos aplica-se o descanso geral do treino
- * (`descansoEntreSeriesSegundos`), uma vez por transição.
+ * Ao concluir cada exercício (exceto o último) aplica-se o seu próprio
+ * descanso de transição (`descansoTransicaoSegundos`) antes do próximo.
  */
-export function calcularDuracaoEstimadaMinutos(
-  exercicios: ItemDuracao[],
-  descansoEntreSeriesSegundos: number,
-): number {
-  const segundosPorExercicio = exercicios.reduce(
-    (total, item) => total + calcularDuracaoExercicioSegundos(item),
-    0,
-  );
+export function calcularDuracaoEstimadaMinutos(exercicios: ItemDuracao[]): number {
+  const segundosPorExercicio = exercicios.reduce((total, item, indice) => {
+    const tempoExecucaoSegundos = (item.series * TEMPO_BASE_SEGUNDOS_POR_SERIE) / item.multiplicadorVelocidade;
+    const descansoProprioSegundos = item.descansoSegundos * Math.max(item.series - 1, 0);
+    const ehUltimoExercicio = indice === exercicios.length - 1;
+    const descansoTransicaoSegundos = ehUltimoExercicio ? 0 : item.descansoTransicaoSegundos;
+    return total + tempoExecucaoSegundos + descansoProprioSegundos + descansoTransicaoSegundos;
+  }, 0);
 
-  const transicoesEntreExercicios = Math.max(exercicios.length - 1, 0);
-  const segundosTransicao = transicoesEntreExercicios * descansoEntreSeriesSegundos;
-
-  const totalSegundos = segundosPorExercicio + segundosTransicao;
-  return Math.max(1, Math.ceil(totalSegundos / 60));
+  return Math.max(1, Math.ceil(segundosPorExercicio / 60));
 }

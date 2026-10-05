@@ -85,17 +85,16 @@ model Exercicio {
 }
 
 model Treino {
-  id                           Int               @id @default(autoincrement())
-  nome                         String
-  instrucao                    String
-  fase                         FaseTreino
-  nivel                        Int
-  quantidadeSemanas            Int               @map("quantidade_semanas")
-  descansoEntreSeriesSegundos  Int               @map("descanso_entre_series_segundos")
-  duracaoEstimadaMinutos       Int               @map("duracao_estimada_minutos")
-  ativo                        Boolean           @default(true)
-  sessoes                      SessaoTreino[]
-  exercicios                   TreinoExercicio[]
+  id                     Int               @id @default(autoincrement())
+  nome                   String
+  instrucao              String
+  fase                   FaseTreino
+  nivel                  Int
+  quantidadeSemanas      Int               @map("quantidade_semanas")
+  duracaoEstimadaMinutos Int               @map("duracao_estimada_minutos")
+  ativo                  Boolean           @default(true)
+  sessoes                SessaoTreino[]
+  exercicios             TreinoExercicio[]
 
   @@map("treino")
 }
@@ -107,6 +106,7 @@ model TreinoExercicio {
   ordem                   Int
   series                  Int
   descansoSegundos        Int       @map("descanso_segundos")
+  descansoTransicaoSegundos Int     @default(30) @map("descanso_transicao_segundos")
   multiplicadorVelocidade Float     @map("multiplicador_velocidade")
   exercicio               Exercicio @relation(fields: [exercicioId], references: [id], onDelete: Cascade)
   treino                  Treino    @relation(fields: [treinoId], references: [id], onDelete: Cascade)
