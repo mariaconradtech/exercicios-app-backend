@@ -4,7 +4,7 @@ import { prisma } from '../prismaClient';
 import { Prisma, FaseTreino } from '../../generated/prisma/client';
 import {
   calcularDuracaoEstimadaMinutos,
-  calcularDuracaoExercicioSegundos,
+  duracaoSerieSegundos,
   faseParaLabel,
   labelParaFase,
   NIVEIS_VALIDOS,
@@ -62,8 +62,9 @@ treinosRouter.get('/participante/:participanteId/ativo', async (req, res) => {
         ordem: te.ordem,
         series: te.series,
         descansoSegundos: te.descansoSegundos,
+        descansoTransicaoSegundos: te.descansoTransicaoSegundos,
         multiplicadorVelocidade: te.multiplicadorVelocidade,
-        duracaoEstimadaSegundos: calcularDuracaoExercicioSegundos(te),
+        duracaoEstimadaSegundos: duracaoSerieSegundos(te.multiplicadorVelocidade),
         exercicio: {
           id: te.exercicio.id,
           nome: te.exercicio.nome,
@@ -108,8 +109,9 @@ treinosRouter.get('/:treinoId/execucao', async (req, res) => {
         ordem: te.ordem,
         series: te.series,
         descansoSegundos: te.descansoSegundos,
+        descansoTransicaoSegundos: te.descansoTransicaoSegundos,
         multiplicadorVelocidade: te.multiplicadorVelocidade,
-        duracaoEstimadaSegundos: calcularDuracaoExercicioSegundos(te),
+        duracaoEstimadaSegundos: duracaoSerieSegundos(te.multiplicadorVelocidade),
         exercicio: {
           id: te.exercicio.id,
           nome: te.exercicio.nome,
@@ -132,6 +134,7 @@ type ItemTreinoExercicioEntrada = {
   ordem: number;
   series: number;
   descansoSegundos: number;
+  descansoTransicaoSegundos: number;
   multiplicadorVelocidade: number;
 };
 
@@ -141,7 +144,6 @@ type TreinoEntradaValidada = {
   fase: FaseTreino;
   nivel: number;
   quantidadeSemanas: number;
-  descansoEntreSeriesSegundos: number;
   exercicios: ItemTreinoExercicioEntrada[];
 };
 
@@ -164,8 +166,7 @@ function validarRequisicaoTreino(body: unknown): { dados: TreinoEntradaValidada 
     return { erro: 'Corpo da requisição inválido.' };
   }
 
-  const { nome, instrucao, fase, nivel, quantidadeSemanas, descansoEntreSeriesSegundos, exercicios } =
-    body as Record<string, unknown>;
+  const { nome, instrucao, fase, nivel, quantidadeSemanas, exercicios } = body as Record<string, unknown>;
 
   if (typeof nome !== 'string' || !nome.trim()) {
     return { erro: "O campo 'nome' é obrigatório." };
@@ -192,12 +193,6 @@ function validarRequisicaoTreino(body: unknown): { dados: TreinoEntradaValidada 
     return { erro: "O campo 'quantidadeSemanas' é obrigatório e deve ser um número inteiro maior que zero." };
   }
 
-  if (!ehInteiro(descansoEntreSeriesSegundos) || descansoEntreSeriesSegundos < 0) {
-    return {
-      erro: "O campo 'descansoEntreSeriesSegundos' é obrigatório e deve ser um número inteiro maior ou igual a zero.",
-    };
-  }
-
   if (!Array.isArray(exercicios) || exercicios.length < 1) {
     return { erro: "O treino deve ter ao menos 1 exercício em 'exercicios'." };
   }
@@ -211,7 +206,8 @@ function validarRequisicaoTreino(body: unknown): { dados: TreinoEntradaValidada 
       return { erro: `O exercício na posição ${indice} de 'exercicios' é inválido.` };
     }
 
-    const { exercicioId, ordem, series, descansoSegundos, multiplicadorVelocidade } = item as Record<string, unknown>;
+    const { exercicioId, ordem, series, descansoSegundos, descansoTransicaoSegundos, multiplicadorVelocidade } =
+      item as Record<string, unknown>;
 
     if (!ehInteiro(exercicioId)) {
       return { erro: `O campo 'exercicioId' do exercício na posição ${indice} é obrigatório e deve ser um número inteiro.` };
@@ -235,6 +231,12 @@ function validarRequisicaoTreino(body: unknown): { dados: TreinoEntradaValidada 
       };
     }
 
+    if (!ehInteiro(descansoTransicaoSegundos) || descansoTransicaoSegundos < 0) {
+      return {
+        erro: `O campo 'descansoTransicaoSegundos' do exercício na posição ${indice} é obrigatório e deve ser um número inteiro maior ou igual a zero.`,
+      };
+    }
+
     if (!ehNumeroPositivo(multiplicadorVelocidade)) {
       return {
         erro: `O campo 'multiplicadorVelocidade' do exercício na posição ${indice} é obrigatório e deve ser um número maior que zero.`,
@@ -246,7 +248,14 @@ function validarRequisicaoTreino(body: unknown): { dados: TreinoEntradaValidada 
     }
     idsVistos.add(exercicioId);
 
-    itensValidados.push({ exercicioId, ordem, series, descansoSegundos, multiplicadorVelocidade });
+    itensValidados.push({
+      exercicioId,
+      ordem,
+      series,
+      descansoSegundos,
+      descansoTransicaoSegundos,
+      multiplicadorVelocidade,
+    });
   }
 
   return {
@@ -256,7 +265,6 @@ function validarRequisicaoTreino(body: unknown): { dados: TreinoEntradaValidada 
       fase: faseEnum,
       nivel,
       quantidadeSemanas,
-      descansoEntreSeriesSegundos,
       exercicios: itensValidados,
     },
   };
@@ -279,15 +287,15 @@ function formatarTreinoDetalhado(treino: TreinoComExercicios) {
     fase: faseParaLabel(treino.fase),
     nivel: treino.nivel,
     quantidadeSemanas: treino.quantidadeSemanas,
-    descansoEntreSeriesSegundos: treino.descansoEntreSeriesSegundos,
     duracaoEstimadaMinutos: treino.duracaoEstimadaMinutos,
     exercicios: treino.exercicios.map((item) => ({
       exercicioId: item.exercicioId,
       ordem: item.ordem,
       series: item.series,
       descansoSegundos: item.descansoSegundos,
+      descansoTransicaoSegundos: item.descansoTransicaoSegundos,
       multiplicadorVelocidade: item.multiplicadorVelocidade,
-      duracaoEstimadaSegundos: calcularDuracaoExercicioSegundos(item),
+      duracaoEstimadaSegundos: duracaoSerieSegundos(item.multiplicadorVelocidade),
     })),
   };
 }
@@ -376,7 +384,7 @@ treinosRouter.post('/', async (req, res) => {
       return;
     }
 
-    const duracaoEstimadaMinutos = calcularDuracaoEstimadaMinutos(dados.exercicios, dados.descansoEntreSeriesSegundos);
+    const duracaoEstimadaMinutos = calcularDuracaoEstimadaMinutos(dados.exercicios);
 
     const treinoCriado = await prisma.treino.create({
       data: {
@@ -385,7 +393,6 @@ treinosRouter.post('/', async (req, res) => {
         fase: dados.fase,
         nivel: dados.nivel,
         quantidadeSemanas: dados.quantidadeSemanas,
-        descansoEntreSeriesSegundos: dados.descansoEntreSeriesSegundos,
         duracaoEstimadaMinutos,
         exercicios: { create: dados.exercicios },
       },
@@ -425,7 +432,7 @@ treinosRouter.put('/:id', async (req, res) => {
       return;
     }
 
-    const duracaoEstimadaMinutos = calcularDuracaoEstimadaMinutos(dados.exercicios, dados.descansoEntreSeriesSegundos);
+    const duracaoEstimadaMinutos = calcularDuracaoEstimadaMinutos(dados.exercicios);
 
     const treinoAtualizado = await prisma.treino.update({
       where: { id },
@@ -435,7 +442,6 @@ treinosRouter.put('/:id', async (req, res) => {
         fase: dados.fase,
         nivel: dados.nivel,
         quantidadeSemanas: dados.quantidadeSemanas,
-        descansoEntreSeriesSegundos: dados.descansoEntreSeriesSegundos,
         duracaoEstimadaMinutos,
         exercicios: {
           deleteMany: {},
