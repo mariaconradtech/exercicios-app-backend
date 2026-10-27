@@ -54,6 +54,7 @@ model Pesquisador {
   id           Int         @id @default(autoincrement())
   usuarioId    Int         @unique @map("usuario_id")
   universidade String
+  senha        String?
   exercicios   Exercicio[]
   usuario      Usuario     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
