@@ -14,6 +14,24 @@ const BONUS_NIVEL_COMPLETO = 100;
 const NIVEIS_COM_TROFEU = [1, 2] as const;
 const FASES: FaseTreino[] = [FaseTreino.INICIANTE, FaseTreino.INTERMEDIARIO, FaseTreino.AVANCADO];
 
+/**
+ * Sessão que CONTA como treino realizado: concluída (100%) ou interrompida com 50% ou mais.
+ * Conta para pontos, prêmios, limite de 3 treinos/semana e progressão de nível (inclusive OMNI).
+ * Decisão da pesquisadora (Alessandra, nov/2026): o público tem menor escolaridade e menos
+ * familiaridade com exercício; ~15 min de uma sessão de 32–40 min já trabalham força ou equilíbrio.
+ * Sessões de 1% a 49% não contam e não pedem a nota OMNI.
+ * O status no banco continua INTERROMPIDA, para a pesquisa distinguir sessões completas das parciais.
+ */
+export const PERCENTUAL_MINIMO_PARA_CONTAR = 50;
+
+export const filtroSessoesQueContam = {
+  OR: [
+    { status: StatusSessao.CONCLUIDA },
+    { status: StatusSessao.INTERROMPIDA, percentualConcluido: { gte: PERCENTUAL_MINIMO_PARA_CONTAR } },
+  ],
+};
+
+
 type PrismaExecutor = Pick<
   PrismaClient,
   'sessaoTreino' | 'perfilGamificado'
@@ -23,6 +41,7 @@ type SessaoGamificacao = {
   id: number;
   dataInicio: Date;
   pontosGanhos: number;
+  esforcoOmni: number | null;
   treino: {
     fase: FaseTreino;
     nivel: number;
@@ -40,7 +59,7 @@ type PerfilCalculado = {
   pontosPorSessao: Map<number, number>;
 };
 
-function inicioDaSemana(data: Date): Date {
+export function inicioDaSemana(data: Date): Date {
   const inicio = new Date(data);
   inicio.setHours(0, 0, 0, 0);
   const diasDesdeSegunda = (inicio.getDay() + 6) % 7;
@@ -65,8 +84,73 @@ function adicionarPontosSessao(pontosPorSessao: Map<number, number>, sessaoId: n
   pontosPorSessao.set(sessaoId, (pontosPorSessao.get(sessaoId) ?? 0) + pontos);
 }
 
-function sessoesNecessariasParaNivel(sessao: SessaoGamificacao): number {
-  return Math.max(1, sessao.treino.quantidadeSemanas) * SESSOES_POR_SEMANA;
+
+/**
+ * Regras de progressão (tabela da pesquisadora). O nível termina pelo que vier primeiro:
+ *  - total de treinos: quantidadeSemanas × 3 (Iniciante N1: 6 semanas = 18; demais: 8 semanas = 24);
+ *  - esforço OMNI: notas de 0 a 4 em sessões seguidas, respeitando um mínimo de treinos e semanas.
+ * Avançado N2 é o último nível: vai até o fim das semanas, sem progressão pela OMNI
+ * (resposta da pesquisadora nas dúvidas do TCC).
+ */
+const ESFORCO_OMNI_LEVE_MAXIMO = 4;
+
+type RegraProgressaoOmni = {
+  sessoesSeguidas: number;
+  minimoTreinos: number;
+  minimoSemanas: number;
+};
+
+export function regraProgressaoOmni(fase: FaseTreino, nivel: number): RegraProgressaoOmni | null {
+  if (fase === FaseTreino.AVANCADO && nivel === 2) {
+    return null;
+  }
+  if (fase === FaseTreino.INICIANTE && nivel === 1) {
+    return { sessoesSeguidas: 9, minimoTreinos: 9, minimoSemanas: 3 };
+  }
+  return { sessoesSeguidas: 12, minimoTreinos: 12, minimoSemanas: 4 };
+}
+
+
+export function indiceConclusaoNivel(
+  sessoesDoNivel: Pick<SessaoGamificacao, 'dataInicio' | 'esforcoOmni' | 'treino'>[],
+): number | null {
+  if (sessoesDoNivel.length === 0) {
+    return null;
+  }
+
+  const { fase, nivel } = sessoesDoNivel[0].treino;
+  const totalNecessario = Math.max(1, sessoesDoNivel[0].treino.quantidadeSemanas) * SESSOES_POR_SEMANA;
+  const regraOmni = regraProgressaoOmni(fase, nivel);
+  const semanas = new Set<string>();
+  let sequenciaOmni = 0;
+
+  for (let index = 0; index < sessoesDoNivel.length; index += 1) {
+    const sessao = sessoesDoNivel[index];
+    const treinosFeitos = index + 1;
+    semanas.add(chaveSemana(sessao.dataInicio));
+
+    if (treinosFeitos >= totalNecessario) {
+      return index;
+    }
+
+    if (!regraOmni) {
+      continue;
+    }
+
+    const esforcoLeve =
+      typeof sessao.esforcoOmni === 'number' && sessao.esforcoOmni <= ESFORCO_OMNI_LEVE_MAXIMO;
+    sequenciaOmni = esforcoLeve ? sequenciaOmni + 1 : 0;
+
+    if (
+      sequenciaOmni >= regraOmni.sessoesSeguidas &&
+      treinosFeitos >= regraOmni.minimoTreinos &&
+      semanas.size >= regraOmni.minimoSemanas
+    ) {
+      return index;
+    }
+  }
+
+  return null;
 }
 
 function calcularFaseNivelAtual(sessoesPorNivel: Map<string, SessaoGamificacao[]>): {
@@ -79,10 +163,8 @@ function calcularFaseNivelAtual(sessoesPorNivel: Map<string, SessaoGamificacao[]
   for (const fase of FASES) {
     const nivel1 = sessoesPorNivel.get(chaveNivel(fase, 1)) ?? [];
     const nivel2 = sessoesPorNivel.get(chaveNivel(fase, 2)) ?? [];
-    const nivel1Completo =
-      nivel1.length > 0 && nivel1.length >= sessoesNecessariasParaNivel(nivel1[0]);
-    const nivel2Completo =
-      nivel2.length > 0 && nivel2.length >= sessoesNecessariasParaNivel(nivel2[0]);
+    const nivel1Completo = indiceConclusaoNivel(nivel1) !== null;
+    const nivel2Completo = indiceConclusaoNivel(nivel2) !== null;
 
     if (nivel2Completo) {
       const proximaFase = faseSeguinte(fase);
@@ -195,10 +277,11 @@ function calcularPerfilGamificado(sessoes: SessaoGamificacao[]): PerfilCalculado
       const sessoesOrdenadasDoNivel = [...sessoesDoNivel].sort(
         (a, b) => a.dataInicio.getTime() - b.dataInicio.getTime(),
       );
-      const sessoesNecessarias = sessoesNecessariasParaNivel(sessoesOrdenadasDoNivel[0]);
+      // Mesmo prêmio para os dois caminhos (total de treinos ou OMNI): troféu, estrela e +100.
+      const indiceConclusao = indiceConclusaoNivel(sessoesOrdenadasDoNivel);
 
-      if (sessoesOrdenadasDoNivel.length >= sessoesNecessarias) {
-        const sessaoPremiada = sessoesOrdenadasDoNivel[sessoesNecessarias - 1];
+      if (indiceConclusao !== null) {
+        const sessaoPremiada = sessoesOrdenadasDoNivel[indiceConclusao];
         adicionarPontosSessao(pontosPorSessao, sessaoPremiada.id, BONUS_NIVEL_COMPLETO);
         trofeus += 1;
         estrelas += 1;
@@ -227,7 +310,7 @@ export async function recalcularGamificacaoParticipante(
   const sessoes = await prismaClient.sessaoTreino.findMany({
     where: {
       participanteId,
-      status: StatusSessao.CONCLUIDA,
+      ...filtroSessoesQueContam,
     },
     include: {
       treino: true,
@@ -272,4 +355,38 @@ export async function recalcularGamificacaoParticipante(
   }
 
   return perfilCalculado;
+}
+
+const UMA_SEMANA_MS = 7 * 24 * 60 * 60 * 1000;
+
+export function calcularSequenciaSemanasCompletas(datasSessoes: Date[], agora: Date = new Date()): number {
+  const porSemana = new Map<number, number>();
+  for (const data of datasSessoes) {
+    const inicio = inicioDaSemana(data).getTime();
+    porSemana.set(inicio, (porSemana.get(inicio) ?? 0) + 1);
+  }
+
+  const semanaAtual = inicioDaSemana(agora).getTime();
+  if ((porSemana.get(semanaAtual) ?? 0) < SESSOES_POR_SEMANA) {
+    porSemana.delete(semanaAtual);
+  }
+
+  const semanas = [...porSemana.entries()].sort(([a], [b]) => a - b);
+  let sequencia = 0;
+  let anterior: number | null = null;
+
+  for (const [inicio, total] of semanas) {
+    const consecutiva = anterior !== null && inicio - anterior === UMA_SEMANA_MS;
+    sequencia = total >= SESSOES_POR_SEMANA ? (consecutiva ? sequencia + 1 : 1) : 0;
+    anterior = inicio;
+    if (sequencia === 3) {
+      sequencia = 0;
+    }
+  }
+
+  if (anterior === null || anterior < semanaAtual - UMA_SEMANA_MS) {
+    return 0;
+  }
+
+  return sequencia;
 }

@@ -1,20 +1,20 @@
 import { Router } from 'express';
 
-import { FaseTreino, StatusSessao } from '../../generated/prisma/client';
+import { FaseTreino } from '../../generated/prisma/client';
 import { prisma } from '../prismaClient';
 import { validarPermissaoVisualizarEngajamento } from '../middlewares/engajamentoPermissao';
+import {
+  calcularSequenciaSemanasCompletas,
+  filtroSessoesQueContam,
+  inicioDaSemana,
+} from '../services/gamificacao';
 
-type CategoriaPodio = 'OURO' | 'PRATA' | 'BRONZE';
-type SessaoConcluidaEngajamento = {
-  dataInicio: Date;
-  pontosGanhos: number;
-  treino: {
-    fase: FaseTreino;
-    nivel: number;
-    quantidadeSemanas: number;
-  };
-};
+const SESSOES_POR_SEMANA = 3;
+const SEMANAS_PARA_ESTRELA = 3;
+const TAMANHO_TOPO_RANKING = 5;
+const SESSOES_NO_GRAFICO = 10;
 
+// Mensagens do arquivo "Mensagens para o app TecnoAging" (item 2: Ranking e progresso).
 const mensagensRankingSemanaParcial = [
   'Você evoluiu mais um pouco essa semana! Parabéns!',
   'Você está evoluindo e ficando cada dia mais forte!',
@@ -30,6 +30,7 @@ const mensagensRankingSemanaCompleta = [
   'Você é muito mais forte e mais capaz, porque realizou a semana de treinos completa! Parabéns!',
 ];
 
+// precisam ser validados pela Alessandra.
 const mensagensRankingSemTreino = [
   'Seu progresso continua te esperando. Realize um treino nesta semana para avançar no ranking!',
   'Cada treino ajuda você a ficar mais forte. Quando estiver pronto, acompanhe sua evolução por aqui!',
@@ -40,47 +41,30 @@ function escolherMensagem(mensagens: string[], seed: number): string {
   return mensagens[Math.abs(seed) % mensagens.length];
 }
 
+function mensagemRankingPorSemana(treinosSemana: number, seed: number): string {
+  if (treinosSemana >= SESSOES_POR_SEMANA) {
+    return escolherMensagem(mensagensRankingSemanaCompleta, seed);
+  }
+  if (treinosSemana >= 1) {
+    return escolherMensagem(mensagensRankingSemanaParcial, seed);
+  }
+  return escolherMensagem(mensagensRankingSemTreino, seed);
+}
+
 function formatarDataCurta(data: Date): string {
   const dia = String(data.getDate()).padStart(2, '0');
   const mes = String(data.getMonth() + 1).padStart(2, '0');
   return `${dia}/${mes}`;
 }
 
-function inicioDaSemana(data: Date): Date {
-  const inicio = new Date(data);
-  inicio.setHours(0, 0, 0, 0);
-  const diasDesdeSegunda = (inicio.getDay() + 6) % 7;
-  inicio.setDate(inicio.getDate() - diasDesdeSegunda);
-  return inicio;
-}
-
-function adicionarDias(data: Date, dias: number): Date {
-  const novaData = new Date(data);
-  novaData.setDate(novaData.getDate() + dias);
-  return novaData;
-}
-
-function categoriaPorFrequencia(totalTreinos: number): CategoriaPodio {
-  if (totalTreinos >= 12) {
-    return 'OURO';
-  }
-
-  if (totalTreinos >= 8) {
-    return 'PRATA';
-  }
-
-  return 'BRONZE';
-}
-
+// Mantidas porque routes/participantes.ts ainda usa (tela Início).
 export function objetivoPorFase(fase: FaseTreino): number {
   if (fase === FaseTreino.INICIANTE) {
     return 10;
   }
-
   if (fase === FaseTreino.INTERMEDIARIO) {
     return 20;
   }
-
   return 30;
 }
 
@@ -88,11 +72,9 @@ export function proximaFase(fase: FaseTreino): FaseTreino | null {
   if (fase === FaseTreino.INICIANTE) {
     return FaseTreino.INTERMEDIARIO;
   }
-
   if (fase === FaseTreino.INTERMEDIARIO) {
     return FaseTreino.AVANCADO;
   }
-
   return null;
 }
 
@@ -100,253 +82,141 @@ function faseParaLabel(fase: FaseTreino): string {
   if (fase === FaseTreino.INICIANTE) {
     return 'Iniciante';
   }
-
   if (fase === FaseTreino.INTERMEDIARIO) {
     return 'Intermediário';
   }
-
   return 'Avançado';
 }
 
-function mensagemRankingPorSemana(concluidasSemanaAtual: number, participanteId: number): string {
-  if (concluidasSemanaAtual >= 3) {
-    return escolherMensagem(mensagensRankingSemanaCompleta, participanteId + concluidasSemanaAtual);
-  }
-
-  if (concluidasSemanaAtual >= 1) {
-    return escolherMensagem(mensagensRankingSemanaParcial, participanteId + concluidasSemanaAtual);
-  }
-
-  return escolherMensagem(mensagensRankingSemTreino, participanteId);
-}
-
-function contarSessoesDaSemanaAteData(sessoes: SessaoConcluidaEngajamento[], data: Date): number {
-  const inicioSemana = inicioDaSemana(data);
-  const fimSemana = adicionarDias(inicioSemana, 7);
-
-  return sessoes.filter(
-    (sessao) =>
-      sessao.dataInicio >= inicioSemana &&
-      sessao.dataInicio < fimSemana &&
-      sessao.dataInicio <= data,
-  ).length;
-}
-
-function completouTresSemanasSeguidas(sessoes: SessaoConcluidaEngajamento[], data: Date): boolean {
-  const inicioSemanaAtual = inicioDaSemana(data);
-
-  for (let offset = 0; offset < 3; offset += 1) {
-    const inicioSemana = adicionarDias(inicioSemanaAtual, offset * -7);
-    const fimSemana = adicionarDias(inicioSemana, 7);
-    const totalSemana = sessoes.filter(
-      (sessao) => sessao.dataInicio >= inicioSemana && sessao.dataInicio < fimSemana,
-    ).length;
-
-    if (totalSemana < 3) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-function completouNivel(sessoes: SessaoConcluidaEngajamento[], ultimaSessao: SessaoConcluidaEngajamento): boolean {
-  const totalSessoesNivel = sessoes.filter(
-    (sessao) =>
-      sessao.dataInicio <= ultimaSessao.dataInicio &&
-      sessao.treino.fase === ultimaSessao.treino.fase &&
-      sessao.treino.nivel === ultimaSessao.treino.nivel,
-  ).length;
-  const necessarias = Math.max(1, ultimaSessao.treino.quantidadeSemanas) * 3;
-
-  return totalSessoesNivel === necessarias;
-}
-
-function mensagensGamificacaoUltimaSessao(
-  ultimaSessao: SessaoConcluidaEngajamento | undefined,
-  sessoes: SessaoConcluidaEngajamento[],
-): string[] {
-  if (!ultimaSessao || ultimaSessao.pontosGanhos <= 0) {
-    return [];
-  }
-
-  const mensagens: string[] = [];
-  const treinosSemana = contarSessoesDaSemanaAteData(sessoes, ultimaSessao.dataInicio);
-
-  if (treinosSemana >= 3) {
-    mensagens.push('Você completou 3 treinos essa semana! Ganhou +50 pontos bônus e medalha!');
-  } else if (treinosSemana === 2) {
-    mensagens.push('Você ganhou 10 pontos pelo treino de hoje + 10 pontos bônus por mais um treino na semana!');
-  } else {
-    mensagens.push('Você ganhou 10 pontos por realizar o treino de hoje!');
-  }
-
-  if (completouTresSemanasSeguidas(sessoes, ultimaSessao.dataInicio)) {
-    mensagens.push('Você completou as últimas 3 semanas de treino! Ganhou +100 pontos bônus e uma estrela!');
-  }
-
-  if (completouNivel(sessoes, ultimaSessao)) {
-    mensagens.push(
-      ultimaSessao.treino.nivel === 2
-        ? 'Você completou mais um nível e passou de fase no game! As conquistas de hoje foram +100 pontos bônus, uma estrela e mais um troféu!'
-        : 'Você completou o nível de treino e conquistou +100 pontos bônus, uma estrela e ganhou o seu troféu!',
-    );
-  }
-
-  return mensagens;
-}
+type LinhaRanking = {
+  participanteId: number;
+  posicao: number;
+  nome: string;
+  pontos: number;
+  estrelas: number;
+  medalhas: number;
+  trofeus: number;
+  ehVoce: boolean;
+};
 
 export const engajamentoRouter = Router();
 
 engajamentoRouter.get('/', validarPermissaoVisualizarEngajamento, async (req, res) => {
   try {
     const participanteId = (req as typeof req & { participanteId: number }).participanteId;
+    const agora = new Date();
 
-    const participantes = await prisma.participante.findMany({
+    const participante = await prisma.participante.findUnique({
+      where: { id: participanteId },
       include: {
         usuario: true,
         perfil: true,
+        // Sessões concluídas ou interrompidas com 50% ou mais (ver filtroSessoesQueContam).
         sessoes: {
-          where: { status: StatusSessao.CONCLUIDA },
-          include: {
-            treino: {
-              select: {
-                fase: true,
-                nivel: true,
-                quantidadeSemanas: true,
-              },
-            },
-          },
+          where: filtroSessoesQueContam,
+          include: { treino: { select: { fase: true, nivel: true } } },
           orderBy: { dataInicio: 'asc' },
         },
       },
     });
 
-    const agora = new Date();
-    const inicioJanelaAtual = new Date(agora);
-    inicioJanelaAtual.setDate(agora.getDate() - 30);
-
-    const inicioJanelaAnterior = new Date(agora);
-    inicioJanelaAnterior.setDate(agora.getDate() - 60);
-    const inicioSemanaAtual = inicioDaSemana(agora);
-
-    const estatisticas = participantes.map((participante) => {
-      const sessoesConcluidas = participante.sessoes;
-      const totalConcluidas = sessoesConcluidas.length;
-
-      const concluidasJanelaAtual = sessoesConcluidas.filter((sessao) => sessao.dataInicio >= inicioJanelaAtual)
-        .length;
-
-      const concluidasJanelaAnterior = sessoesConcluidas.filter(
-        (sessao) => sessao.dataInicio >= inicioJanelaAnterior && sessao.dataInicio < inicioJanelaAtual,
-      ).length;
-      const concluidasSemanaAtual = sessoesConcluidas.filter((sessao) => sessao.dataInicio >= inicioSemanaAtual)
-        .length;
-
-      const categoriaAtual = categoriaPorFrequencia(concluidasJanelaAtual);
-      const categoriaAnterior = categoriaPorFrequencia(concluidasJanelaAnterior);
-
-      return {
-        participanteId: participante.id,
-        nome: participante.usuario.nome,
-        nomeAvatar: participante.perfil?.nomeAvatar?.trim() || participante.usuario.nome,
-        perfil: participante.perfil,
-        totalConcluidas,
-        concluidasJanelaAtual,
-        concluidasSemanaAtual,
-        categoriaAtual,
-        categoriaAnterior,
-        sessoesConcluidas,
-      };
-    });
-
-    const participanteAtual = estatisticas.find((item) => item.participanteId === participanteId);
-    if (!participanteAtual) {
-      res.status(404).json({ error: 'Participante não encontrado no ranking' });
+    if (!participante) {
+      res.status(404).json({ error: 'Participante não encontrado' });
       return;
     }
 
-    const perfilAtual = participanteAtual.perfil;
-    const faseAtual = perfilAtual?.faseAtual ?? FaseTreino.INICIANTE;
-    const rankingOrdenado = estatisticas
-      .filter((item) => (item.perfil?.faseAtual ?? FaseTreino.INICIANTE) === faseAtual)
-      .sort((a, b) => {
-        const pontosA = a.perfil?.pontos ?? 0;
-        const pontosB = b.perfil?.pontos ?? 0;
+    const fase = participante.perfil?.faseAtual ?? FaseTreino.INICIANTE;
+    const nivelAtual = participante.perfil?.nivelAtual ?? 1;
+    const sessoes = participante.sessoes;
 
-        if (pontosB !== pontosA) {
-          return pontosB - pontosA;
-        }
-
-        if (b.totalConcluidas !== a.totalConcluidas) {
-          return b.totalConcluidas - a.totalConcluidas;
-        }
-
-        return a.nome.localeCompare(b.nome);
-      });
-    const objetivoAtual = objetivoPorFase(faseAtual);
-    const faltantes = Math.max(0, objetivoAtual - participanteAtual.totalConcluidas);
-    const progressoPercentual = Math.min(
-      100,
-      Math.round((participanteAtual.totalConcluidas / objetivoAtual) * 100),
+    const inicioSemana = inicioDaSemana(agora);
+    const treinosSemana = sessoes.filter((sessao) => sessao.dataInicio >= inicioSemana).length;
+    const semanasSeguidas = calcularSequenciaSemanasCompletas(
+      sessoes.map((sessao) => sessao.dataInicio),
+      agora,
     );
 
-    const historicoEsforco = participanteAtual.sessoesConcluidas
-      .slice(-10)
-      .map((sessao) => ({
-        data: formatarDataCurta(sessao.dataInicio),
-        valor: typeof sessao.esforcoOmni === 'number' ? sessao.esforcoOmni : 0,
-      }));
+    // Ranking: participantes da mesma fase.
+    // Critérios do documento de gamificação: pontos → estrelas → medalhas → troféus.
+    const perfisDaFase = await prisma.perfilGamificado.findMany({
+      where: { faseAtual: fase },
+      include: { participante: { include: { usuario: true } } },
+    });
 
-    const podioCategorias: CategoriaPodio[] = ['OURO', 'PRATA', 'BRONZE'];
-    const podio = rankingOrdenado.slice(0, 3).map((item, index) => ({
-      categoria: podioCategorias[index] ?? 'BRONZE',
-      participanteNome: item.nomeAvatar,
-      treinosConcluidos: item.totalConcluidas,
+    const ordenado = perfisDaFase
+      .map((perfil) => ({
+        participanteId: perfil.participanteId,
+        nome: perfil.nomeAvatar?.trim() || perfil.participante.usuario.nome,
+        pontos: perfil.pontos,
+        estrelas: perfil.estrelas,
+        medalhas: perfil.medalhas,
+        trofeus: perfil.trofeus,
+      }))
+      .sort(
+        (a, b) =>
+          b.pontos - a.pontos ||
+          b.estrelas - a.estrelas ||
+          b.medalhas - a.medalhas ||
+          b.trofeus - a.trofeus ||
+          a.nome.localeCompare(b.nome),
+      );
+
+    const ranking: LinhaRanking[] = ordenado.map((item, index) => ({
+      ...item,
+      posicao: index + 1,
+      ehVoce: item.participanteId === participanteId,
     }));
 
-    const ranking = rankingOrdenado.slice(0, 6).map((item) => {
-      const pontosBase = item.perfil?.pontos ?? item.totalConcluidas * 10;
+    const topo = ranking.slice(0, TAMANHO_TOPO_RANKING);
+    const linhaDoParticipante = ranking.find((linha) => linha.ehVoce) ?? null;
+    const participanteForaDoTopo =
+      linhaDoParticipante && linhaDoParticipante.posicao > TAMANHO_TOPO_RANKING ? linhaDoParticipante : null;
 
-      return {
-        participanteId: item.participanteId,
-        nome: item.nomeAvatar,
-        nomeAvatar: item.nomeAvatar,
-        bronze: pontosBase,
-        estrelas: item.perfil?.estrelas ?? Math.round(item.totalConcluidas * 0.6),
-        medalhas: item.perfil?.medalhas ?? Math.round(item.totalConcluidas * 0.45),
-        trofeus: item.perfil?.trofeus ?? Math.round(item.totalConcluidas * 0.3),
-      };
+    const treinoDoNivel = await prisma.treino.findFirst({
+      where: { fase, nivel: nivelAtual, ativo: true },
+      select: { quantidadeSemanas: true },
     });
-    const posicaoRanking = rankingOrdenado.findIndex((item) => item.participanteId === participanteId) + 1;
-    const ultimaSessao = participanteAtual.sessoesConcluidas[participanteAtual.sessoesConcluidas.length - 1];
-    const mensagensGamificacao = mensagensGamificacaoUltimaSessao(
-      ultimaSessao,
-      participanteAtual.sessoesConcluidas,
-    );
+    const sessoesNecessarias = Math.max(1, treinoDoNivel?.quantidadeSemanas ?? 1) * SESSOES_POR_SEMANA;
+    const sessoesRealizadas = sessoes.filter(
+      (sessao) => sessao.treino.fase === fase && sessao.treino.nivel === nivelAtual,
+    ).length;
+    const progressoPercentual = Math.min(100, Math.round((sessoesRealizadas / sessoesNecessarias) * 100));
+    const programaConcluido =
+      fase === FaseTreino.AVANCADO && nivelAtual === 2 && sessoesRealizadas >= sessoesNecessarias;
+
+    // Percepção de esforço: só sessões com resposta (0 é um valor válido da escala OMNI).
+    const percepcaoEsforco = sessoes
+      .filter((sessao) => typeof sessao.esforcoOmni === 'number')
+      .slice(-SESSOES_NO_GRAFICO)
+      .map((sessao) => ({
+        data: formatarDataCurta(sessao.dataInicio),
+        valor: sessao.esforcoOmni as number,
+      }));
 
     res.json({
       participanteId,
-      categoriaAtual: participanteAtual.categoriaAtual,
-      mudouCategoria: participanteAtual.categoriaAtual !== participanteAtual.categoriaAnterior,
-      mensagemCelebracao: mensagemRankingPorSemana(participanteAtual.concluidasSemanaAtual, participanteId),
-      resumoGamificacao: {
-        faseAtual: faseParaLabel(faseAtual),
-        posicaoRanking,
-        totalParticipantesFase: rankingOrdenado.length,
-        sessoesSemanaAtual: participanteAtual.concluidasSemanaAtual,
-        mensagens: mensagensGamificacao,
+      mensagem: mensagemRankingPorSemana(treinosSemana, participanteId + agora.getDate()),
+      fase,
+      faseLabel: faseParaLabel(fase),
+      semana: {
+        treinosRealizados: Math.min(treinosSemana, SESSOES_POR_SEMANA),
+        meta: SESSOES_POR_SEMANA,
+        semanasSeguidasCompletas: semanasSeguidas,
+        semanasParaEstrela: SEMANAS_PARA_ESTRELA,
       },
-      podio,
-      ranking,
-      proximoNivel: {
-        nivelAtual: faseParaLabel(faseAtual),
-        proximoNivel: proximaFase(faseAtual) ? faseParaLabel(proximaFase(faseAtual) as FaseTreino) : null,
-        treinosConcluidos: participanteAtual.totalConcluidas,
-        treinosFaltantes: faltantes,
+      ranking: {
+        itens: topo,
+        participanteForaDoTopo,
+        totalParticipantes: ranking.length,
+      },
+      nivel: {
+        nivelAtual,
+        sessoesRealizadas: Math.min(sessoesRealizadas, sessoesNecessarias),
+        sessoesNecessarias,
         progressoPercentual,
+        programaConcluido,
       },
-      percepcaoEsforco: historicoEsforco,
+      percepcaoEsforco,
     });
   } catch (error) {
     res.status(500).json({ error: error instanceof Error ? error.message : 'Erro desconhecido' });

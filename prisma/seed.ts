@@ -2,7 +2,6 @@ import 'dotenv/config';
 import { PrismaClient, TipoUsuario, GeneroAvatar, FaseTreino, StatusSessao } from '../generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { calcularDuracaoEstimadaMinutos } from '../src/utils/treino';
-import { gerarHashSenha } from '../src/utils/senha';
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
@@ -11,18 +10,10 @@ const prisma = new PrismaClient({ adapter });
 async function main() {
   console.log('Iniciando o seeding do banco de dados...');
 
-  // 1. Usuário Pesquisador (necessário para cadastrar exercícios e treinos).
-  // Login na área web: pesquisador@ufpr.br / pesquisador123
-  const senhaPesquisador = await gerarHashSenha('pesquisador123');
+  // 1. Usuário Pesquisador (necessário para cadastrar exercícios e treinos)
   const userPesquisador = await prisma.usuario.upsert({
     where: { email: 'pesquisador@ufpr.br' },
-    update: {
-      pesquisador: {
-        update: {
-          senha: senhaPesquisador,
-        },
-      },
-    },
+    update: {},
     create: {
       nome: 'Dr. Pesquisador',
       email: 'pesquisador@ufpr.br',
@@ -30,7 +21,6 @@ async function main() {
       pesquisador: {
         create: {
           universidade: 'UFPR',
-          senha: senhaPesquisador,
         },
       },
     },
@@ -171,7 +161,7 @@ async function main() {
       instrucao: 'Tapete, Halteres leves, Banco de exercícios',
       fase: FaseTreino.INICIANTE,
       nivel: 1,
-      quantidadeSemanas: 4,
+      quantidadeSemanas: 6, // Iniciante N1: 6 semanas = 18 treinos (tabela de progressão)
       duracaoEstimadaMinutos: calcularDuracaoEstimadaMinutos(itensTreino),
       ativo: true,
       exercicios: {
@@ -191,7 +181,7 @@ async function main() {
       participante: {
         create: {
           cpf: '12345678900',
-          senha: await gerarHashSenha('senha_segura_123'),
+          senha: 'senha_segura_123',
           perfil: {
           create: {
             avatarGenero: GeneroAvatar.FEMININO,
