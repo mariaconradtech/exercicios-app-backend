@@ -7,6 +7,7 @@ import { PrismaClient, Prisma, StatusSessao } from '../generated/prisma/client';
 
 import { autenticacaoRouter } from './routes/autenticacao';
 import { participantesRouter } from './routes/participantes';
+import { pesquisadoresRouter } from './routes/pesquisadores';
 import { categoriasRouter } from './routes/categorias';
 import { sessoesRouter } from './routes/sessoes';
 import { treinosRouter } from './routes/treinos';
@@ -43,6 +44,7 @@ app.get('/health', (_req, res) => {
 
 app.use(autenticacaoRouter);
 app.use('/participantes', participantesRouter);
+app.use('/pesquisadores', pesquisadoresRouter);
 app.use('/treinos', treinosRouter);
 app.use('/sessoes', sessoesRouter);
 app.use('/categorias', categoriasRouter);

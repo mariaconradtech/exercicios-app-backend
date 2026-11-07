@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../prismaClient';
+import { TipoUsuario } from '../../generated/prisma/client';
 import { gerarHashSenha, senhaAtendeRegra, senhaEstaComHash, verificarSenha } from '../utils/senha';
 
 export const autenticacaoRouter = Router();
@@ -89,14 +90,16 @@ autenticacaoRouter.patch('/senha', async (req, res) => {
   }
 });
 
-function buscarUsuarioPesquisadorPorEmail(email: string) {
+function buscarUsuarioWebPorEmail(email: string) {
   return prisma.usuario.findFirst({
     where: { email: { equals: email.trim(), mode: 'insensitive' } },
-    include: { pesquisador: true },
+    include: { pesquisador: true, administrador: true },
   });
 }
 
-autenticacaoRouter.post('/pesquisadores/login', async (req, res) => {
+// Login único da área web: o mesmo formulário atende administradores e
+// pesquisadores, e o campo `tipo` da resposta diz para onde o frontend leva.
+autenticacaoRouter.post('/web/login', async (req, res) => {
   try {
     const { email, senha } = req.body as { email?: string; senha?: string };
 
@@ -108,19 +111,29 @@ autenticacaoRouter.post('/pesquisadores/login', async (req, res) => {
       return res.status(400).json({ error: 'Senha é obrigatória' });
     }
 
-    const usuario = await buscarUsuarioPesquisadorPorEmail(email);
-    const pesquisador = usuario?.pesquisador;
+    const usuario = await buscarUsuarioWebPorEmail(email);
 
-    if (!usuario || !pesquisador?.senha || !(await verificarSenha(senha, pesquisador.senha))) {
-      return res.status(401).json({ error: 'Email ou senha inválidos' });
+    if (usuario?.administrador && (await verificarSenha(senha, usuario.administrador.senha))) {
+      return res.json({
+        tipo: TipoUsuario.ADMIN,
+        usuarioId: usuario.id,
+        nome: usuario.nome,
+        email: usuario.email,
+      });
     }
 
-    res.json({
-      usuarioId: usuario.id,
-      pesquisadorId: pesquisador.id,
-      nome: usuario.nome,
-      email: usuario.email,
-    });
+    const pesquisador = usuario?.pesquisador;
+    if (usuario && pesquisador?.senha && (await verificarSenha(senha, pesquisador.senha))) {
+      return res.json({
+        tipo: TipoUsuario.PESQUISADOR,
+        usuarioId: usuario.id,
+        pesquisadorId: pesquisador.id,
+        nome: usuario.nome,
+        email: usuario.email,
+      });
+    }
+
+    res.status(401).json({ error: 'Email ou senha inválidos' });
   } catch (error) {
     res
       .status(500)
@@ -144,7 +157,7 @@ autenticacaoRouter.patch('/pesquisadores/senha', async (req, res) => {
       return res.status(400).json({ error: MENSAGEM_REGRA_SENHA });
     }
 
-    const usuario = await buscarUsuarioPesquisadorPorEmail(email);
+    const usuario = await buscarUsuarioWebPorEmail(email);
 
     if (!usuario?.pesquisador) {
       return res.status(404).json({ error: 'Email não encontrado' });

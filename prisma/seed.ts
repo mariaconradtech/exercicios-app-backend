@@ -39,6 +39,30 @@ async function main() {
 
   const pesquisadorId = userPesquisador.pesquisador!.id;
 
+  // Administrador da área web (cadastra pesquisadores e participantes).
+  // Login: admin@ufpr.br / admin123
+  const senhaAdmin = await gerarHashSenha('admin123');
+  await prisma.usuario.upsert({
+    where: { email: 'admin@ufpr.br' },
+    update: {
+      administrador: {
+        update: {
+          senha: senhaAdmin,
+        },
+      },
+    },
+    create: {
+      nome: 'Administrador',
+      email: 'admin@ufpr.br',
+      tipo: TipoUsuario.ADMIN,
+      administrador: {
+        create: {
+          senha: senhaAdmin,
+        },
+      },
+    },
+  });
+
   // 2. Categoria dos exercícios
   const categoriaForca = await prisma.categoria.upsert({
     where: { nome: 'Força' },
