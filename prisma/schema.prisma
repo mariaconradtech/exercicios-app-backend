@@ -15,8 +15,9 @@ model Usuario {
   tipo         TipoUsuario   @default(PARTICIPANTE)
   criadoEm     DateTime      @default(now()) @map("criado_em")
   atualizadoEm DateTime      @updatedAt @map("atualizado_em")
-  participante Participante?
-  pesquisador  Pesquisador?
+  participante  Participante?
+  pesquisador   Pesquisador?
+  administrador Administrador?
 
   @@map("usuario")
 }
@@ -59,6 +60,15 @@ model Pesquisador {
   usuario      Usuario     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
   @@map("pesquisador")
+}
+
+model Administrador {
+  id        Int     @id @default(autoincrement())
+  usuarioId Int     @unique @map("usuario_id")
+  senha     String
+  usuario   Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@map("administrador")
 }
 
 model Categoria {
@@ -149,6 +159,7 @@ model SessaoExercicio {
 enum TipoUsuario {
   PESQUISADOR
   PARTICIPANTE
+  ADMIN
 }
 
 enum GeneroAvatar {
