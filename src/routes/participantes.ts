@@ -1,8 +1,9 @@
 import { Router } from 'express';
 
 import { prisma } from '../prismaClient';
-import { FaseTreino, GeneroAvatar, Prisma, StatusSessao } from '../../generated/prisma/client';
+import { FaseTreino, GeneroAvatar, Prisma } from '../../generated/prisma/client';
 import { faseParaLabel } from '../utils/treino';
+import { filtroSessoesQueContam } from '../services/gamificacao';
 import { objetivoPorFase, proximaFase } from './engajamento';
 
 export const participantesRouter = Router();
@@ -20,7 +21,7 @@ participantesRouter.get('/:participanteId/perfil', async (req, res) => {
       include: {
         usuario: true,
         perfil: true,
-        sessoes: { where: { status: StatusSessao.CONCLUIDA } },
+        sessoes: { where: filtroSessoesQueContam },
       },
     });
 
@@ -92,13 +93,13 @@ participantesRouter.get('/:participanteId/inicio', async (req, res) => {
       prisma.sessaoTreino.findMany({
         where: {
           participanteId,
-          status: StatusSessao.CONCLUIDA,
+          ...filtroSessoesQueContam,
           dataInicio: { gte: inicioMes, lt: inicioProximoMes },
         },
         select: { dataInicio: true },
       }),
       prisma.sessaoTreino.findFirst({
-        where: { participanteId, status: StatusSessao.CONCLUIDA },
+        where: { participanteId, ...filtroSessoesQueContam },
         orderBy: { dataInicio: 'desc' },
         include: {
           treino: { include: { _count: { select: { exercicios: true } } } },

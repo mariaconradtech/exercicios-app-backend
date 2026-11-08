@@ -35,6 +35,7 @@ treinosRouter.get('/participante/:participanteId/ativo', async (req, res) => {
       where: {
         ativo: true,
         fase: participante.perfil?.faseAtual ?? FaseTreino.INICIANTE,
+        nivel: participante.perfil?.nivelAtual ?? 1,
       },
       include: {
         exercicios: {
