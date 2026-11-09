@@ -1,5 +1,6 @@
 import { Router } from 'express';
 
+import { exigirAdmin } from '../middlewares/exigirAdmin';
 import { prisma } from '../prismaClient';
 import { TipoUsuario } from '../../generated/prisma/client';
 import { gerarHashSenha, senhaAtendeRegra } from '../utils/senha';
@@ -13,11 +14,10 @@ function textoPreenchido(valor: unknown): valor is string {
 }
 
 // Cadastro de pesquisador feito pelo administrador na área web.
-pesquisadoresRouter.post('/', async (req, res) => {
-  const { nome, email, universidade, senha } = req.body as {
+pesquisadoresRouter.post('/', exigirAdmin, async (req, res) => {
+  const { nome, email, senha } = req.body as {
     nome?: unknown;
     email?: unknown;
-    universidade?: unknown;
     senha?: unknown;
   };
 
@@ -27,10 +27,6 @@ pesquisadoresRouter.post('/', async (req, res) => {
 
   if (!textoPreenchido(email) || !FORMATO_EMAIL.test(email.trim())) {
     return res.status(400).json({ error: 'Informe um email válido' });
-  }
-
-  if (!textoPreenchido(universidade)) {
-    return res.status(400).json({ error: 'Universidade é obrigatória' });
   }
 
   if (!textoPreenchido(senha)) {
@@ -59,7 +55,6 @@ pesquisadoresRouter.post('/', async (req, res) => {
         tipo: TipoUsuario.PESQUISADOR,
         pesquisador: {
           create: {
-            universidade: universidade.trim(),
             senha: await gerarHashSenha(senha),
           },
         },
@@ -72,7 +67,6 @@ pesquisadoresRouter.post('/', async (req, res) => {
       usuarioId: usuario.id,
       nome: usuario.nome,
       email: usuario.email,
-      universidade: usuario.pesquisador!.universidade,
     });
   } catch (error) {
     return res

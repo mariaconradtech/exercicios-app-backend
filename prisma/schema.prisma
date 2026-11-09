@@ -25,7 +25,6 @@ model Usuario {
 model Participante {
   id         Int               @id @default(autoincrement())
   usuarioId  Int               @unique @map("usuario_id")
-  idExterno  String?           @unique @map("id_externo")
   cpf        String            @unique
   senha      String
   dataAdesao DateTime          @default(now()) @map("data_adesao")
@@ -54,7 +53,6 @@ model PerfilGamificado {
 model Pesquisador {
   id           Int         @id @default(autoincrement())
   usuarioId    Int         @unique @map("usuario_id")
-  universidade String
   senha        String?
   exercicios   Exercicio[]
   usuario      Usuario     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
@@ -86,7 +84,7 @@ model Exercicio {
   nome          String
   videoUrl      String            @map("video_url")
   instrucao     String[]          @map("instrucao")
-  ativo         Boolean           @default(true)
+  ativo       Boolean           @default(true)
   categoria     Categoria         @relation(fields: [categoriaId], references: [id])
   pesquisador   Pesquisador       @relation(fields: [pesquisadorId], references: [id])
   treinos       TreinoExercicio[]
@@ -119,6 +117,8 @@ model TreinoExercicio {
   descansoSegundos        Int       @map("descanso_segundos")
   descansoTransicaoSegundos Int     @default(30) @map("descanso_transicao_segundos")
   multiplicadorVelocidade Float     @map("multiplicador_velocidade")
+  /// Velocidade de reprodução do vídeo do exercício neste treino (1 = original, 0.5 = metade, 2 = dobro).
+  velocidadeExecucao      Float     @default(1) @map("velocidade_execucao")
   exercicio               Exercicio @relation(fields: [exercicioId], references: [id], onDelete: Cascade)
   treino                  Treino    @relation(fields: [treinoId], references: [id], onDelete: Cascade)
 

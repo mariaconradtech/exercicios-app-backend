@@ -9,7 +9,6 @@ let pesquisadorPadraoId: number | null = null;
 
 const PESQUISADOR_PADRAO_EMAIL = 'pesquisador.padrao@sistema.local';
 const PESQUISADOR_PADRAO_NOME = 'Pesquisador Padrão';
-const PESQUISADOR_PADRAO_UNIVERSIDADE = 'Não informado';
 
 async function criarPesquisadorPadrao(): Promise<number> {
   try {
@@ -18,7 +17,7 @@ async function criarPesquisadorPadrao(): Promise<number> {
         nome: PESQUISADOR_PADRAO_NOME,
         email: PESQUISADOR_PADRAO_EMAIL,
         tipo: TipoUsuario.PESQUISADOR,
-        pesquisador: { create: { universidade: PESQUISADOR_PADRAO_UNIVERSIDADE } },
+        pesquisador: { create: {} },
       },
       include: { pesquisador: true },
     });

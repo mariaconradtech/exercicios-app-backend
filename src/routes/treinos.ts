@@ -65,6 +65,7 @@ treinosRouter.get('/participante/:participanteId/ativo', async (req, res) => {
         descansoSegundos: te.descansoSegundos,
         descansoTransicaoSegundos: te.descansoTransicaoSegundos,
         multiplicadorVelocidade: te.multiplicadorVelocidade,
+        velocidadeExecucao: te.velocidadeExecucao,
         duracaoEstimadaSegundos: duracaoSerieSegundos(te.multiplicadorVelocidade),
         exercicio: {
           id: te.exercicio.id,
@@ -112,6 +113,7 @@ treinosRouter.get('/:treinoId/execucao', async (req, res) => {
         descansoSegundos: te.descansoSegundos,
         descansoTransicaoSegundos: te.descansoTransicaoSegundos,
         multiplicadorVelocidade: te.multiplicadorVelocidade,
+        velocidadeExecucao: te.velocidadeExecucao,
         duracaoEstimadaSegundos: duracaoSerieSegundos(te.multiplicadorVelocidade),
         exercicio: {
           id: te.exercicio.id,
@@ -137,7 +139,13 @@ type ItemTreinoExercicioEntrada = {
   descansoSegundos: number;
   descansoTransicaoSegundos: number;
   multiplicadorVelocidade: number;
+  velocidadeExecucao: number;
 };
+
+// Velocidade de reprodução do vídeo: faixa suportada pelos players
+// (HTML5 <video> e expo-av) sem distorção relevante.
+const VELOCIDADE_EXECUCAO_MINIMA = 0.25;
+const VELOCIDADE_EXECUCAO_MAXIMA = 2;
 
 type TreinoEntradaValidada = {
   nome: string;
@@ -207,8 +215,15 @@ function validarRequisicaoTreino(body: unknown): { dados: TreinoEntradaValidada 
       return { erro: `O exercício na posição ${indice} de 'exercicios' é inválido.` };
     }
 
-    const { exercicioId, ordem, series, descansoSegundos, descansoTransicaoSegundos, multiplicadorVelocidade } =
-      item as Record<string, unknown>;
+    const {
+      exercicioId,
+      ordem,
+      series,
+      descansoSegundos,
+      descansoTransicaoSegundos,
+      multiplicadorVelocidade,
+      velocidadeExecucao = 1,
+    } = item as Record<string, unknown>;
 
     if (!ehInteiro(exercicioId)) {
       return { erro: `O campo 'exercicioId' do exercício na posição ${indice} é obrigatório e deve ser um número inteiro.` };
@@ -244,6 +259,17 @@ function validarRequisicaoTreino(body: unknown): { dados: TreinoEntradaValidada 
       };
     }
 
+    if (
+      typeof velocidadeExecucao !== 'number' ||
+      !Number.isFinite(velocidadeExecucao) ||
+      velocidadeExecucao < VELOCIDADE_EXECUCAO_MINIMA ||
+      velocidadeExecucao > VELOCIDADE_EXECUCAO_MAXIMA
+    ) {
+      return {
+        erro: `O campo 'velocidadeExecucao' do exercício na posição ${indice} deve ser um número entre ${VELOCIDADE_EXECUCAO_MINIMA} e ${VELOCIDADE_EXECUCAO_MAXIMA}.`,
+      };
+    }
+
     if (idsVistos.has(exercicioId)) {
       return { erro: `O exercício com id ${exercicioId} está duplicado na lista de 'exercicios'.` };
     }
@@ -256,6 +282,7 @@ function validarRequisicaoTreino(body: unknown): { dados: TreinoEntradaValidada 
       descansoSegundos,
       descansoTransicaoSegundos,
       multiplicadorVelocidade,
+      velocidadeExecucao,
     });
   }
 
@@ -296,6 +323,7 @@ function formatarTreinoDetalhado(treino: TreinoComExercicios) {
       descansoSegundos: item.descansoSegundos,
       descansoTransicaoSegundos: item.descansoTransicaoSegundos,
       multiplicadorVelocidade: item.multiplicadorVelocidade,
+      velocidadeExecucao: item.velocidadeExecucao,
       duracaoEstimadaSegundos: duracaoSerieSegundos(item.multiplicadorVelocidade),
     })),
   };
