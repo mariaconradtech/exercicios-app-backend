@@ -25,6 +25,10 @@ pesquisadoresRouter.post('/', exigirAdmin, async (req, res) => {
     return res.status(400).json({ error: 'Nome é obrigatório' });
   }
 
+  if (nome.includes('@')) {
+    return res.status(400).json({ error: 'Informe o nome do pesquisador, não o email' });
+  }
+
   if (!textoPreenchido(email) || !FORMATO_EMAIL.test(email.trim())) {
     return res.status(400).json({ error: 'Informe um email válido' });
   }

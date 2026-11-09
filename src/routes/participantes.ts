@@ -31,6 +31,11 @@ participantesRouter.post('/', exigirAdmin, async (req, res) => {
     return res.status(400).json({ error: 'Nome é obrigatório' });
   }
 
+  // O nome aparece na saudação do app; evita gravar o email no lugar dele.
+  if (nome.includes('@')) {
+    return res.status(400).json({ error: 'Informe o nome do participante, não o email' });
+  }
+
   if (!textoPreenchido(cpf) || !cpfValido(cpf)) {
     return res.status(400).json({ error: 'Informe um CPF válido' });
   }
