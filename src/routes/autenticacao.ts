@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../prismaClient';
 import { TipoUsuario } from '../../generated/prisma/client';
 import { gerarHashSenha, senhaAtendeRegra, senhaEstaComHash, verificarSenha } from '../utils/senha';
+import { extrairTokenBearer, gerarTokenSessao, hashTokenSessao } from '../utils/tokenSessao';
 
 export const autenticacaoRouter = Router();
 
@@ -114,8 +115,14 @@ autenticacaoRouter.post('/web/login', async (req, res) => {
     const usuario = await buscarUsuarioWebPorEmail(email);
 
     if (usuario?.administrador && (await verificarSenha(senha, usuario.administrador.senha))) {
+      // Só o administrador recebe token: é o que libera as rotas de cadastro.
+      // Um novo login substitui o token anterior.
+      const { token, hash } = gerarTokenSessao();
+      await prisma.usuario.update({ where: { id: usuario.id }, data: { token: hash } });
+
       return res.json({
         tipo: TipoUsuario.ADMIN,
+        token,
         usuarioId: usuario.id,
         nome: usuario.nome,
         email: usuario.email,
@@ -134,6 +141,22 @@ autenticacaoRouter.post('/web/login', async (req, res) => {
     }
 
     res.status(401).json({ error: 'Email ou senha inválidos' });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ error: error instanceof Error ? error.message : 'Erro desconhecido' });
+  }
+});
+
+// Encerra a sessão da área web invalidando o token no servidor.
+autenticacaoRouter.post('/web/logout', async (req, res) => {
+  const token = extrairTokenBearer(req.header('authorization'));
+
+  try {
+    if (token) {
+      await prisma.usuario.updateMany({ where: { token: hashTokenSessao(token) }, data: { token: null } });
+    }
+    res.status(204).end();
   } catch (error) {
     res
       .status(500)

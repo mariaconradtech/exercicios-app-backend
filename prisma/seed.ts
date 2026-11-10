@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { PrismaClient, TipoUsuario, GeneroAvatar, FaseTreino, StatusSessao } from '../generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { calcularDuracaoEstimadaMinutos } from '../src/utils/treino';
+import { gerarHashSenha } from '../src/utils/senha';
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
@@ -19,9 +20,7 @@ async function main() {
       email: 'pesquisador@ufpr.br',
       tipo: TipoUsuario.PESQUISADOR,
       pesquisador: {
-        create: {
-          universidade: 'UFPR',
-        },
+        create: {},
       },
     },
     include: { pesquisador: true },

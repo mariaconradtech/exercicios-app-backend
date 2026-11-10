@@ -1,12 +1,109 @@
 import { Router } from 'express';
 
+import { exigirAdmin } from '../middlewares/exigirAdmin';
 import { prisma } from '../prismaClient';
-import { FaseTreino, GeneroAvatar, Prisma } from '../../generated/prisma/client';
+import { FaseTreino, GeneroAvatar, Prisma, TipoUsuario } from '../../generated/prisma/client';
+import { cpfValido } from '../utils/cpf';
+import { gerarHashSenha, senhaAtendeRegra } from '../utils/senha';
 import { faseParaLabel } from '../utils/treino';
 import { filtroSessoesQueContam } from '../services/gamificacao';
 import { objetivoPorFase, proximaFase } from './engajamento';
 
 export const participantesRouter = Router();
+
+const FORMATO_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function textoPreenchido(valor: unknown): valor is string {
+  return typeof valor === 'string' && valor.trim().length > 0;
+}
+
+// Cadastro de participante feito pelo administrador na área web. O participante
+// entra no aplicativo com o CPF e a senha definidos aqui.
+participantesRouter.post('/', exigirAdmin, async (req, res) => {
+  const { nome, cpf, email, senha } = req.body as {
+    nome?: unknown;
+    cpf?: unknown;
+    email?: unknown;
+    senha?: unknown;
+  };
+
+  if (!textoPreenchido(nome)) {
+    return res.status(400).json({ error: 'Nome é obrigatório' });
+  }
+
+  // O nome aparece na saudação do app; evita gravar o email no lugar dele.
+  if (nome.includes('@')) {
+    return res.status(400).json({ error: 'Informe o nome do participante, não o email' });
+  }
+
+  if (!textoPreenchido(cpf) || !cpfValido(cpf)) {
+    return res.status(400).json({ error: 'Informe um CPF válido' });
+  }
+
+  if (!textoPreenchido(email) || !FORMATO_EMAIL.test(email.trim())) {
+    return res.status(400).json({ error: 'Informe um email válido' });
+  }
+
+  if (!textoPreenchido(senha)) {
+    return res.status(400).json({ error: 'Senha é obrigatória' });
+  }
+
+  if (!senhaAtendeRegra(senha)) {
+    return res.status(400).json({ error: 'A senha deve ter pelo menos 8 caracteres, com letras e números' });
+  }
+
+  const cpfNormalizado = cpf.replace(/\D/g, '');
+  const emailNormalizado = email.trim().toLowerCase();
+
+  try {
+    const [cpfEmUso, emailEmUso] = await Promise.all([
+      prisma.participante.findUnique({ where: { cpf: cpfNormalizado }, select: { id: true } }),
+      prisma.usuario.findFirst({
+        where: { email: { equals: emailNormalizado, mode: 'insensitive' } },
+        select: { id: true },
+      }),
+    ]);
+
+    if (cpfEmUso) {
+      return res.status(409).json({ error: 'Já existe um participante cadastrado com este CPF' });
+    }
+    if (emailEmUso) {
+      return res.status(409).json({ error: 'Já existe um usuário cadastrado com este email' });
+    }
+
+    const usuario = await prisma.usuario.create({
+      data: {
+        nome: nome.trim(),
+        email: emailNormalizado,
+        tipo: TipoUsuario.PARTICIPANTE,
+        participante: {
+          create: {
+            cpf: cpfNormalizado,
+            senha: await gerarHashSenha(senha),
+          },
+        },
+      },
+      include: { participante: true },
+    });
+
+    return res.status(201).json({
+      participanteId: usuario.participante!.id,
+      usuarioId: usuario.id,
+      nome: usuario.nome,
+      email: usuario.email,
+      cpf: usuario.participante!.cpf,
+      dataAdesao: usuario.participante!.dataAdesao,
+    });
+  } catch (error) {
+    // Corrida entre a verificação acima e o insert: outro cadastro usou o mesmo dado.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return res.status(409).json({ error: 'CPF ou email já cadastrado' });
+    }
+    return res
+      .status(500)
+      .json({ error: error instanceof Error ? error.message : 'Erro desconhecido' });
+  }
+});
 
 participantesRouter.get('/:participanteId/perfil', async (req, res) => {
   const participanteId = Number(req.params.participanteId);
