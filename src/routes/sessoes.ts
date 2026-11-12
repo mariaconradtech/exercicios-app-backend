@@ -95,3 +95,34 @@ sessoesRouter.patch('/:sessaoId/finalizar', async (req, res) => {
     res.status(500).json({ error: error instanceof Error ? error.message : 'Erro desconhecido' });
   }
 });
+
+/**
+ * Marca que a pergunta "Quando você retornar por aqui, deseja refazer esse
+ * treino?" (item 3 do documento de mensagens) já foi exibida para essa sessão,
+ * para não repetir em todo login — independentemente da resposta (sim ou não).
+ */
+sessoesRouter.patch('/:sessaoId/pergunta-refazer', async (req, res) => {
+  try {
+    const sessaoId = Number(req.params.sessaoId);
+
+    if (!Number.isInteger(sessaoId) || sessaoId <= 0) {
+      res.status(400).json({ error: 'sessaoId inválido' });
+      return;
+    }
+
+    const sessao = await prisma.sessaoTreino.findUnique({ where: { id: sessaoId } });
+    if (!sessao) {
+      res.status(404).json({ error: 'Sessão não encontrada' });
+      return;
+    }
+
+    await prisma.sessaoTreino.update({
+      where: { id: sessaoId },
+      data: { perguntaRefazerExibida: true },
+    });
+
+    res.status(204).end();
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Erro desconhecido' });
+  }
+});
