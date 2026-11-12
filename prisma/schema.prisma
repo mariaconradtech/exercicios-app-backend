@@ -23,14 +23,43 @@ model Usuario {
 }
 
 model Participante {
-  id         Int               @id @default(autoincrement())
-  usuarioId  Int               @unique @map("usuario_id")
-  cpf        String            @unique
-  senha      String
-  dataAdesao DateTime          @default(now()) @map("data_adesao")
-  usuario    Usuario           @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  perfil     PerfilGamificado?
-  sessoes    SessaoTreino[]
+  id             Int               @id @default(autoincrement())
+  usuarioId      Int               @unique @map("usuario_id")
+  cpf            String            @unique
+  senha          String
+  dataAdesao     DateTime          @default(now()) @map("data_adesao")
+  /**
+   * Data de nascimento informada no cadastro (usada para idade/faixa etária no
+   * Painel do Pesquisador). Opcional porque participantes cadastrados antes
+   * desse campo existir não têm esse dado — nesse caso os cards do painel que
+   * dependem de idade exibem "Sem dados" em vez de inventar um valor.
+   */
+  dataNascimento DateTime?         @map("data_nascimento") @db.Date
+  /**
+   * Sexo declarado no cadastro (usado na distribuição por sexo do Painel do
+   * Pesquisador). Não confundir com `PerfilGamificado.avatarGenero`, que é
+   * apenas a escolha estética do avatar dentro do aplicativo.
+   */
+  sexo           Sexo?             @map("sexo")
+  /**
+   * Token do Expo Push Notifications do dispositivo mais recente em que o
+   * participante fez login. Usado pelo agendador de notificações (lembrete
+   * padrão, lembrete repetido e lembrete semanal) para enviar push "fora do
+   * app". Fica nulo quando o participante nunca autorizou notificações ou
+   * fez logout (nesse caso o token é removido).
+   */
+  expoPushToken  String?           @map("expo_push_token")
+  /**
+   * Data (sem hora) do último envio de cada tipo de lembrete, usada só para
+   * não enviar o mesmo lembrete duas vezes no mesmo dia/semana. Não tem
+   * relação com a pesquisa, é apenas controle interno do agendador.
+   */
+  ultimoLembretePadraoEnviadoEm   DateTime? @map("ultimo_lembrete_padrao_enviado_em") @db.Timestamptz(3)
+  ultimoLembreteRepetidoEnviadoEm DateTime? @map("ultimo_lembrete_repetido_enviado_em") @db.Timestamptz(3)
+  ultimoLembreteSemanalEnviadoEm  DateTime? @map("ultimo_lembrete_semanal_enviado_em") @db.Timestamptz(3)
+  usuario        Usuario           @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  perfil         PerfilGamificado?
+  sessoes        SessaoTreino[]
 
   @@map("participante")
 }
@@ -137,6 +166,14 @@ model SessaoTreino {
   status                 StatusSessao     @default(EM_ANDAMENTO)
   esforcoOmni            Int?             @map("esforco_omni")
   pontosGanhos           Int              @default(0) @map("pontos_ganhos")
+  /**
+   * Controla a "terceira mensagem" do fluxo de finalização antecipada (1% a
+   * 49% do treino): "Quando você retornar por aqui, deseja refazer esse
+   * treino?". Marcado como true depois que a pergunta aparece uma vez na
+   * tela inicial, para não repetir em todo login. Só é relevante quando
+   * status = INTERROMPIDA e percentualConcluido < 50.
+   */
+  perguntaRefazerExibida Boolean          @default(false) @map("pergunta_refazer_exibida")
   participante           Participante     @relation(fields: [participanteId], references: [id])
   treino                 Treino           @relation(fields: [treinoId], references: [id])
   exercicios             SessaoExercicio[]
@@ -163,6 +200,12 @@ enum TipoUsuario {
 }
 
 enum GeneroAvatar {
+  FEMININO
+  MASCULINO
+}
+
+/** Sexo declarado pelo participante no cadastro (dado demográfico da pesquisa). */
+enum Sexo {
   FEMININO
   MASCULINO
 }

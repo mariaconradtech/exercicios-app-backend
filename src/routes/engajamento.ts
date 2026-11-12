@@ -13,6 +13,8 @@ const SESSOES_POR_SEMANA = 3;
 const SEMANAS_PARA_ESTRELA = 3;
 const TAMANHO_TOPO_RANKING = 5;
 const SESSOES_NO_GRAFICO = 10;
+/** Quantidade de alunos exibidos em cada ranking do Painel do Pesquisador (um por fase). */
+const TAMANHO_TOPO_RANKING_PESQUISADOR = 10;
 
 // Mensagens do arquivo "Mensagens para o app TecnoAging" (item 2: Ranking e progresso).
 const mensagensRankingSemanaParcial = [
@@ -99,6 +101,43 @@ type LinhaRanking = {
   ehVoce: boolean;
 };
 
+/**
+ * Monta o ranking ordenado de uma fase inteira (critérios do documento de
+ * gamificação: pontos → estrelas → medalhas → troféus → nome). Usado tanto pelo
+ * ranking do participante (tela de engajamento do app) quanto pelo ranking do
+ * Painel do Pesquisador (3 rankings, um por fase).
+ */
+async function construirRankingDaFase(fase: FaseTreino, participanteIdAtual: number | null): Promise<LinhaRanking[]> {
+  const perfisDaFase = await prisma.perfilGamificado.findMany({
+    where: { faseAtual: fase },
+    include: { participante: { include: { usuario: true } } },
+  });
+
+  const ordenado = perfisDaFase
+    .map((perfil) => ({
+      participanteId: perfil.participanteId,
+      nome: perfil.nomeAvatar?.trim() || perfil.participante.usuario.nome,
+      pontos: perfil.pontos,
+      estrelas: perfil.estrelas,
+      medalhas: perfil.medalhas,
+      trofeus: perfil.trofeus,
+    }))
+    .sort(
+      (a, b) =>
+        b.pontos - a.pontos ||
+        b.estrelas - a.estrelas ||
+        b.medalhas - a.medalhas ||
+        b.trofeus - a.trofeus ||
+        a.nome.localeCompare(b.nome),
+    );
+
+  return ordenado.map((item, index) => ({
+    ...item,
+    posicao: index + 1,
+    ehVoce: participanteIdAtual !== null && item.participanteId === participanteIdAtual,
+  }));
+}
+
 export const engajamentoRouter = Router();
 
 engajamentoRouter.get('/', validarPermissaoVisualizarEngajamento, async (req, res) => {
@@ -137,36 +176,7 @@ engajamentoRouter.get('/', validarPermissaoVisualizarEngajamento, async (req, re
     );
 
     // Ranking: participantes da mesma fase.
-    // Critérios do documento de gamificação: pontos → estrelas → medalhas → troféus.
-    const perfisDaFase = await prisma.perfilGamificado.findMany({
-      where: { faseAtual: fase },
-      include: { participante: { include: { usuario: true } } },
-    });
-
-    const ordenado = perfisDaFase
-      .map((perfil) => ({
-        participanteId: perfil.participanteId,
-        nome: perfil.nomeAvatar?.trim() || perfil.participante.usuario.nome,
-        pontos: perfil.pontos,
-        estrelas: perfil.estrelas,
-        medalhas: perfil.medalhas,
-        trofeus: perfil.trofeus,
-      }))
-      .sort(
-        (a, b) =>
-          b.pontos - a.pontos ||
-          b.estrelas - a.estrelas ||
-          b.medalhas - a.medalhas ||
-          b.trofeus - a.trofeus ||
-          a.nome.localeCompare(b.nome),
-      );
-
-    const ranking: LinhaRanking[] = ordenado.map((item, index) => ({
-      ...item,
-      posicao: index + 1,
-      ehVoce: item.participanteId === participanteId,
-    }));
-
+    const ranking = await construirRankingDaFase(fase, participanteId);
     const topo = ranking.slice(0, TAMANHO_TOPO_RANKING);
     const linhaDoParticipante = ranking.find((linha) => linha.ehVoce) ?? null;
     const participanteForaDoTopo =
@@ -218,6 +228,34 @@ engajamentoRouter.get('/', validarPermissaoVisualizarEngajamento, async (req, re
       },
       percepcaoEsforco,
     });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Erro desconhecido' });
+  }
+});
+
+const FASES_RANKING: FaseTreino[] = [FaseTreino.INICIANTE, FaseTreino.INTERMEDIARIO, FaseTreino.AVANCADO];
+
+/**
+ * Ranking do Painel do Pesquisador: Top alunos de cada uma das 3 fases (Básico,
+ * Intermediário, Avançado). Reaproveita o mesmo componente/critério de ordenação
+ * usado no ranking do app do participante (TabelaRanking), só que sem recorte por
+ * "ehVoce" e trazendo as 3 fases de uma vez.
+ */
+engajamentoRouter.get('/ranking', async (_req, res) => {
+  try {
+    const rankings = await Promise.all(
+      FASES_RANKING.map(async (fase) => {
+        const ranking = await construirRankingDaFase(fase, null);
+        return {
+          fase,
+          faseLabel: faseParaLabel(fase),
+          itens: ranking.slice(0, TAMANHO_TOPO_RANKING_PESQUISADOR),
+          totalParticipantes: ranking.length,
+        };
+      }),
+    );
+
+    res.json({ rankings });
   } catch (error) {
     res.status(500).json({ error: error instanceof Error ? error.message : 'Erro desconhecido' });
   }

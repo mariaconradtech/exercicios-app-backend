@@ -13,7 +13,9 @@ import { sessoesRouter } from './routes/sessoes';
 import { treinosRouter } from './routes/treinos';
 import { engajamentoRouter } from './routes/engajamento';
 import { exerciciosRouter } from './routes/exercicios';
+import { dashboardRouter } from './routes/dashboard';
 import { recalcularGamificacaoParticipante } from './services/gamificacao';
+import { iniciarAgendadorNotificacoes } from './services/agendadorNotificacoes';
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const app = express();
@@ -50,6 +52,7 @@ app.use('/sessoes', sessoesRouter);
 app.use('/categorias', categoriasRouter);
 app.use('/engajamento', engajamentoRouter);
 app.use('/exercicios', exerciciosRouter);
+app.use('/dashboard', dashboardRouter);
 
 app.post('/avaliacoes', async (req, res) => {
   const { sessaoId, rating } = req.body as { sessaoId?: unknown; rating?: unknown };
@@ -132,4 +135,6 @@ app.use((err: unknown, _req: express.Request, res: express.Response, next: expre
 const PORT = Number(process.env.PORT ?? 3000);
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
+  // Lembrete padrão, lembrete repetido e lembrete semanal (push fora do app).
+  iniciarAgendadorNotificacoes(prisma);
 });
