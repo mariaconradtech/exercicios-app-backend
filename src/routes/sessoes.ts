@@ -2,12 +2,41 @@ import { Router } from 'express';
 
 import { prisma } from '../prismaClient';
 import { StatusSessao } from '../../generated/prisma/client';
+import { filtroSessoesQueContam } from '../services/gamificacao';
 
 export const sessoesRouter = Router();
+
+/**
+ * Mensagem devolvida quando o participante tenta iniciar um 2º treino no
+ * mesmo dia. Regra de negócio: só 1 treino "que conta" (ver
+ * filtroSessoesQueContam) por participante por dia. O texto é o mesmo exibido
+ * no card "Próximo Treino" do app quando o botão de iniciar já está desativado
+ * — chega aqui só se alguém tentar contornar a tela (ex.: requisição manual).
+ */
+export const MENSAGEM_TREINO_JA_REALIZADO_HOJE =
+  'Você já completou o treino de hoje! Parabéns pela sua dedicação e cuidado com a saúde. Descanse bem, te espero amanhã para o próximo treino!';
 
 sessoesRouter.post('/', async (req, res) => {
   try {
     const { treinoId, participanteId } = req.body as { treinoId: number; participanteId: number };
+
+    const agora = new Date();
+    const inicioHoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
+    const inicioAmanha = new Date(inicioHoje.getTime() + 24 * 60 * 60 * 1000);
+
+    const jaTreinouHoje = await prisma.sessaoTreino.findFirst({
+      where: {
+        participanteId,
+        ...filtroSessoesQueContam,
+        dataInicio: { gte: inicioHoje, lt: inicioAmanha },
+      },
+      select: { id: true },
+    });
+
+    if (jaTreinouHoje) {
+      res.status(409).json({ error: MENSAGEM_TREINO_JA_REALIZADO_HOJE });
+      return;
+    }
 
     const sessao = await prisma.sessaoTreino.create({
       data: {
